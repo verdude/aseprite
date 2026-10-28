@@ -292,8 +292,14 @@ FileOpROI::FileOpROI(const Doc* doc,
   , m_framesSeq(framesSeq)
 {
   if (doc) {
-    if (!sliceName.empty())
-      m_slice = doc->sprite()->slices().getByName(sliceName);
+    if (!sliceName.empty()) {
+      for (auto* slice : doc->sprite()->slices()) {
+        if (!slice->isCollisionBox() && slice->name() == sliceName) {
+          m_slice = slice;
+          break;
+        }
+      }
+    }
 
     // Don't allow exporting frame tags with empty names
     if (!tagName.empty())

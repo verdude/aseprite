@@ -76,7 +76,8 @@ void DefaultCliDelegate::afterOpenFile(const CliOpenFile& cof)
 
   if (cof.listSlices) {
     for (doc::Slice* slice : cof.document->sprite()->slices())
-      std::cout << slice->name() << "\n";
+      if (!slice->isCollisionBox())
+        std::cout << slice->name() << "\n";
   }
 }
 

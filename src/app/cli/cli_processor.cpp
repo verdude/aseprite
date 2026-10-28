@@ -783,13 +783,23 @@ void CliProcessor::saveFile(Context* ctx, const CliOpenFile& cof)
 
   std::vector<doc::Slice*> slices;
   if (cof.hasSlice()) {
-    slices.push_back(doc->sprite()->slices().getByName(cof.slice));
+    doc::Slice* selectedSlice = nullptr;
+    for (auto* slice : doc->sprite()->slices()) {
+      if (!slice->isCollisionBox() && slice->name() == cof.slice) {
+        selectedSlice = slice;
+        break;
+      }
+    }
+    slices.push_back(selectedSlice);
   }
   else {
     doc::Slices& origSlices = cof.document->sprite()->slices();
     if (cof.splitSlices && !origSlices.empty()) {
       for (doc::Slice* slice : origSlices)
-        slices.push_back(slice);
+        if (!slice->isCollisionBox())
+          slices.push_back(slice);
+      if (slices.empty())
+        slices.push_back(nullptr);
     }
     else
       slices.push_back(nullptr);

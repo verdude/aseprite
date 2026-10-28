@@ -279,6 +279,8 @@ public:
   }
   const Tag* tag() const { return m_tag; }
   SelectedLayers* selectedLayers() const { return m_selLayers; }
+  bool isAnimationFrame() const { return !m_image && !m_gridCell; }
+  void setGridCell() { m_gridCell = true; }
   frame_t frame() const { return m_frame; }
   std::string filename() const { return m_filename; }
   const gfx::Size& originalSize() const { return m_originalSize; }
@@ -439,6 +441,7 @@ private:
   // (e.g. like a Tileset tile image) this can be != nullptr.
   ImageRef m_image;
   SelectedLayers* m_selLayers;
+  bool m_gridCell = false;
   frame_t m_frame;
   const Tag* m_tag;
   std::string m_filename;
@@ -1188,6 +1191,7 @@ void DocExporter::captureSamples(Samples& samples, base::task_token& token)
         sample.setTrimmedBounds(spriteBounds);
 
       if (item.splitGrid) {
+        sample.setGridCell();
         const gfx::Rect& gridBounds = sprite->gridBounds();
         gfx::Point initPos(0, 0), pos;
         initPos = pos = snap_to_grid(gridBounds, initPos, PreferSnapTo::BoxOrigin);
@@ -1501,8 +1505,32 @@ void DocExporter::createDataFile(const Samples& samples, std::ostream& os, doc::
        << "    \"sourceSize\": { "
        << "\"w\": " << srcSize.w << ", "
        << "\"h\": " << srcSize.h << " },\n"
-       << "    \"duration\": " << sample.sprite()->frameDuration(sample.frame()) << "\n"
-       << "   }";
+       << "    \"duration\": " << sample.sprite()->frameDuration(sample.frame());
+
+    if (sample.isAnimationFrame()) {
+      // Frame-local collision data is independent of overlay visibility and
+      // of the optional regular slice metadata. Bounds stay in canvas space.
+      for (const auto kind : { SliceKind::Hurtbox, SliceKind::Hitbox }) {
+        os << ",\n    \"" << (kind == SliceKind::Hitbox ? "hitboxes" : "hurtboxes") << "\": [";
+        bool first = true;
+        for (const auto* box : sample.sprite()->slices()) {
+          if (box->kind() != kind)
+            continue;
+          const auto* key = box->getByFrame(sample.frame());
+          if (!key || key->isEmpty())
+            continue;
+          if (!first)
+            os << ", ";
+          first = false;
+          const auto& bounds = key->bounds();
+          os << "{ \"name\": \"" << escape_for_json(box->name()) << "\", \"bounds\": {"
+             << "\"x\": " << bounds.x << ", \"y\": " << bounds.y << ", \"w\": " << bounds.w
+             << ", \"h\": " << bounds.h << "} }";
+        }
+        os << "]";
+      }
+    }
+    os << "\n   }";
 
     if (++it != samples.end())
       os << ",\n";
@@ -1706,6 +1734,8 @@ void DocExporter::createDataFile(const Samples& samples, std::ostream& os, doc::
       // TODO add possibility to export some slices
 
       for (Slice* slice : sprite->slices()) {
+        if (slice->isCollisionBox())
+          continue;
         if (firstSlice)
           firstSlice = false;
         else
