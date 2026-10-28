@@ -25,8 +25,10 @@
 #include "app/cmd/remove_cel.h"
 #include "app/cmd/remove_frame.h"
 #include "app/cmd/remove_layer.h"
+#include "app/cmd/remove_slice.h"
 #include "app/cmd/remove_tag.h"
 #include "app/cmd/replace_image.h"
+#include "app/cmd/set_box_frame.h"
 #include "app/cmd/set_cel_bounds.h"
 #include "app/cmd/set_cel_frame.h"
 #include "app/cmd/set_cel_opacity.h"
@@ -159,8 +161,10 @@ void DocApi::cropSprite(Sprite* sprite, const gfx::Rect& bounds, const bool trim
                     m_document->mask()->bounds().y - bounds.y);
 
   // Update slice positions
-  if (bounds.origin() != gfx::Point(0, 0)) {
-    for (auto& slice : m_document->sprite()->slices()) {
+  if (bounds.origin() != gfx::Point(0, 0) || trimOutside) {
+    // Removing a completely cropped box invalidates collection iterators.
+    const std::vector<Slice*> slices(sprite->slices().begin(), sprite->slices().end());
+    for (auto* slice : slices) {
       Slice::List::List keys;
       std::copy(slice->begin(), slice->end(), std::back_inserter(keys));
 
@@ -188,7 +192,10 @@ void DocApi::cropSprite(Sprite* sprite, const gfx::Rect& bounds, const bool trim
         // As SliceKey::center() and pivot() properties are relative
         // to the bounds(), we don't need to adjust them.
 
-        m_transaction.execute(new cmd::SetSliceKey(slice, k.frame(), newKey));
+        if (slice->isCollisionBox() && newKey.isEmpty())
+          m_transaction.execute(new cmd::RemoveSlice(sprite, slice));
+        else
+          m_transaction.execute(new cmd::SetSliceKey(slice, k.frame(), newKey));
       }
     }
   }
@@ -425,6 +432,27 @@ void DocApi::moveFrame(Sprite* sprite,
       if (targetFrame >= frame)
         --targetFrame;
       adjustTags(sprite, targetFrame, +1, dropFramePlace, tagsHandling);
+    }
+
+    for (auto* box : sprite->slices()) {
+      if (!box->isCollisionBox())
+        continue;
+      const frame_t oldFrame = box->boxFrame();
+      frame_t newFrame = oldFrame;
+      if (frame < beforeFrame) {
+        if (oldFrame == frame)
+          newFrame = beforeFrame - 1;
+        else if (oldFrame > frame && oldFrame < beforeFrame)
+          --newFrame;
+      }
+      else if (beforeFrame < frame) {
+        if (oldFrame == frame)
+          newFrame = beforeFrame;
+        else if (oldFrame >= beforeFrame && oldFrame < frame)
+          ++newFrame;
+      }
+      if (oldFrame != newFrame)
+        m_transaction.execute(new cmd::SetBoxFrame(box, newFrame));
     }
 
     // Change cel positions.

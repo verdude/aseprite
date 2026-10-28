@@ -63,6 +63,8 @@ private:
   gfx::Point m_pivot;
 };
 
+enum class SliceKind { Slice, Hitbox, Hurtbox };
+
 class Slice : public WithUserData {
 public:
   typedef Keyframes<SliceKey> List;
@@ -74,6 +76,15 @@ public:
   ~Slice();
 
   int getMemSize() const override;
+
+  // Collision boxes are independent, single-frame slices. The marker is stored
+  // in a separate user-data namespace so existing native files remain readable.
+  static constexpr const char* CollisionData = "aseprite.collision";
+  SliceKind kind() const;
+  bool isCollisionBox() const { return kind() != SliceKind::Slice; }
+  void setKind(SliceKind kind);
+  frame_t boxFrame() const { return fromFrame(); }
+  void setBoxFrame(frame_t frame);
 
   void insert(const frame_t frame, const SliceKey& key);
   void remove(const frame_t frame);

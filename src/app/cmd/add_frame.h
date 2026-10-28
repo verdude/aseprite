@@ -11,6 +11,7 @@
 #include "app/cmd.h"
 #include "app/cmd/add_cel.h"
 #include "app/cmd/with_sprite.h"
+#include "app/cmd_sequence.h"
 #include "doc/frame.h"
 
 #include <memory>
@@ -30,11 +31,16 @@ public:
 protected:
   void onExecute() override;
   void onUndo() override;
-  size_t onMemSize() const override { return sizeof(*this) + (m_addCel ? m_addCel->memSize() : 0); }
+  size_t onMemSize() const override
+  {
+    return sizeof(*this) + m_boxFrames.memSize() + (m_addCel ? m_addCel->memSize() : 0);
+  }
 
 private:
   void moveFrames(Layer* layer, frame_t fromThis, frame_t delta);
 
+  CmdSequence m_boxFrames;
+  bool m_firstTime = true;
   frame_t m_newFrame;
   std::unique_ptr<AddCel> m_addCel;
 };

@@ -1038,6 +1038,30 @@ TEST_F(DocRangeOps, ReverseCels)
   // TODO
 }
 
+TEST_F(DocRangeOps, CollisionBoxesFollowWholeFrames)
+{
+  std::vector<Slice*> boxes;
+  for (frame_t frame = 0; frame < 6; ++frame) {
+    auto* box = new Slice;
+    box->setKind(frame % 2 ? SliceKind::Hurtbox : SliceKind::Hitbox);
+    box->insert(frame, SliceKey(gfx::Rect(frame, 0, 1, 1)));
+    sprite->slices().add(box);
+    boxes.push_back(box);
+  }
+  reverse_frames(doc.get(), frames_range(1, 4));
+  for (frame_t original = 0; original < 6; ++original) {
+    const frame_t current = original >= 1 && original <= 4 ? 5 - original : original;
+    EXPECT_EQ(current, boxes[original]->boxFrame());
+    EXPECT_EQ(original + 1, sprite->frameDuration(current));
+  }
+  doc->undoHistory()->undo();
+  for (frame_t frame = 0; frame < 6; ++frame)
+    EXPECT_EQ(frame, boxes[frame]->boxFrame());
+  doc->undoHistory()->redo();
+  EXPECT_EQ(4, boxes[1]->boxFrame());
+  EXPECT_EQ(1, boxes[4]->boxFrame());
+}
+
 TEST(DocRangeOps2, DropInsideBugs)
 {
   TestContextT<app::Context> ctx;

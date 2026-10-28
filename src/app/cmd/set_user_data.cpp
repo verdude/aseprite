@@ -13,6 +13,7 @@
 
 #include "app/doc.h"
 #include "app/doc_event.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 #include "doc/with_user_data.h"
 
@@ -24,6 +25,12 @@ SetUserData::SetUserData(doc::WithUserData* obj, const doc::UserData& userData, 
   , m_oldUserData(obj->userData())
   , m_newUserData(userData)
 {
+  if (obj->type() == doc::ObjectType::Slice) {
+    auto* slice = static_cast<doc::Slice*>(obj);
+    if (slice->isCollisionBox())
+      m_newUserData.properties(doc::Slice::CollisionData) = slice->userData().properties(
+        doc::Slice::CollisionData);
+  }
 }
 
 void SetUserData::onExecute()

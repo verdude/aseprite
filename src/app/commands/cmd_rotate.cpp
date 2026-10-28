@@ -11,6 +11,7 @@
 
 #include "app/app.h"
 #include "app/cmd/set_cel_bounds.h"
+#include "app/cmd/set_slice_key.h"
 #include "app/commands/cmd_rotate.h"
 #include "app/commands/params.h"
 #include "app/doc_api.h"
@@ -28,6 +29,7 @@
 #include "doc/cels_range.h"
 #include "doc/image.h"
 #include "doc/mask.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 
 namespace app {
@@ -155,6 +157,18 @@ protected:
 
       // Copy new mask
       api.copyToCurrentMask(new_mask.get());
+    }
+
+    if (m_rotateSprite) {
+      for (auto* box : sprite()->slices()) {
+        if (!box->isCollisionBox() || box->empty())
+          continue;
+        auto key = *box->begin()->value();
+        auto bounds = key.bounds();
+        rotate_rect(bounds);
+        key.setBounds(bounds);
+        tx(new cmd::SetSliceKey(box, box->boxFrame(), key));
+      }
     }
 
     // change the sprite's size

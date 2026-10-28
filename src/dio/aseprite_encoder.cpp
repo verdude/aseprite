@@ -88,7 +88,7 @@ bool AsepriteEncoder::encode()
     }
 
     // Write extra chunks in the first frame
-    if (frame == delegate()->fromFrame()) {
+    if (outputFrame == 0) {
       // Write sprite user data only if needed
       if (!sprite->userData().isEmpty())
         writeUserDataChunk(&frame_header, ext_files, &sprite->userData());
@@ -905,6 +905,20 @@ void AsepriteEncoder::writeSliceChunks(AsepriteFrameHeader* frame_header,
                                        const frame_t toFrame)
 {
   for (Slice* slice : slices) {
+    if (slice->isCollisionBox()) {
+      // A sequence can reorder or repeat frames. Each output occurrence owns
+      // an independent box, just as it does when duplicating a timeline frame.
+      frame_t outputFrame = 0;
+      for (const auto frame : delegate()->framesSequence()) {
+        const auto* key = slice->getByFrame(frame);
+        if (key && !key->isEmpty()) {
+          writeSliceChunk(frame_header, slice, frame, frame, outputFrame);
+          writeUserDataChunk(frame_header, ext_files, &slice->userData());
+        }
+        ++outputFrame;
+      }
+      continue;
+    }
     // Skip slices that are outside of the given ROI
     if (slice->range(fromFrame, toFrame).empty())
       continue;
@@ -919,7 +933,8 @@ void AsepriteEncoder::writeSliceChunks(AsepriteFrameHeader* frame_header,
 void AsepriteEncoder::writeSliceChunk(AsepriteFrameHeader* frame_header,
                                       Slice* slice,
                                       const frame_t fromFrame,
-                                      const frame_t toFrame)
+                                      const frame_t toFrame,
+                                      const frame_t outputFrame)
 {
   const ChunkWriter chunk(this, frame_header, ASE_FILE_CHUNK_SLICE);
 
@@ -946,7 +961,7 @@ void AsepriteEncoder::writeSliceChunk(AsepriteFrameHeader* frame_header,
   const SliceKey* oldKey = nullptr;
   for (auto* key : range) {
     if (frame == firstFromFrame || key != oldKey) {
-      write32(frame);
+      write32(slice->isCollisionBox() ? outputFrame : frame);
       write32((int32_t)(key ? key->bounds().x : 0));
       write32((int32_t)(key ? key->bounds().y : 0));
       write32(key ? key->bounds().w : 0);
@@ -1041,7 +1056,9 @@ void AsepriteEncoder::writeExternalFilesChunk(AsepriteFrameHeader* frame_header,
 
   for (Slice* slice : sprite->slices()) {
     // Skip slices that are outside of the given ROI
-    if (slice->range(delegate()->fromFrame(), delegate()->toFrame()).empty())
+    if (slice->isCollisionBox() ?
+          !delegate()->framesSequence().contains(slice->boxFrame()) :
+          slice->range(delegate()->fromFrame(), delegate()->toFrame()).empty())
       continue;
 
     putExtentionIds(slice->userData().propertiesMaps(), ext_files);
@@ -1194,8 +1211,8 @@ void AsepriteEncoder::writePropertyValue(const UserData::Variant& value, int& de
     case USER_DATA_PROPERTY_TYPE_UINT32: write32(*std::get_if<uint32_t>(&value)); break;
     case USER_DATA_PROPERTY_TYPE_INT64:  write64(*std::get_if<int64_t>(&value)); break;
     case USER_DATA_PROPERTY_TYPE_UINT64: write64(*std::get_if<uint64_t>(&value)); break;
-    case USER_DATA_PROPERTY_TYPE_FIXED:  write32(std::get_if<UserData::Fixed>(&value)->value); break;
-    case USER_DATA_PROPERTY_TYPE_FLOAT:  writeFloat(*std::get_if<float>(&value)); break;
+    case USER_DATA_PROPERTY_TYPE_FIXED: write32(std::get_if<UserData::Fixed>(&value)->value); break;
+    case USER_DATA_PROPERTY_TYPE_FLOAT: writeFloat(*std::get_if<float>(&value)); break;
     case USER_DATA_PROPERTY_TYPE_DOUBLE: writeDouble(*std::get_if<double>(&value)); break;
     case USER_DATA_PROPERTY_TYPE_STRING: writeString(*std::get_if<std::string>(&value)); break;
     case USER_DATA_PROPERTY_TYPE_POINT:  writePoint(*std::get_if<gfx::Point>(&value)); break;

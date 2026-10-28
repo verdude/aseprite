@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "doc/keyframes.h"
+#include "doc/slice.h"
 
 using namespace doc;
 
@@ -142,4 +143,26 @@ int main(int argc, char** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+}
+
+TEST(Slice, CollisionBoxesAreFrameLocal)
+{
+  Slice box;
+  box.setKind(SliceKind::Hitbox);
+  box.insert(3, SliceKey(gfx::Rect(1, 2, 8, 9)));
+  EXPECT_EQ(nullptr, box.getByFrame(2));
+  ASSERT_NE(nullptr, box.getByFrame(3));
+  EXPECT_EQ(nullptr, box.getByFrame(4));
+  box.insert(4, SliceKey(gfx::Rect(2, 3, 4, 5)));
+  EXPECT_EQ(1, box.size());
+  box.remove(2);
+  EXPECT_EQ(1, box.size());
+  box.setBoxFrame(5);
+  EXPECT_EQ(nullptr, box.getByFrame(3));
+  EXPECT_EQ(gfx::Rect(1, 2, 8, 9), box.getByFrame(5)->bounds());
+  Slice copy(box);
+  EXPECT_EQ(SliceKind::Hitbox, copy.kind());
+  EXPECT_EQ(5, copy.boxFrame());
+  copy.setKind(SliceKind::Hurtbox);
+  EXPECT_EQ(SliceKind::Hitbox, box.kind());
 }

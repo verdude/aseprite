@@ -10,8 +10,10 @@
 
 #include "app/cmd/set_total_frames.h"
 
+#include "app/cmd/remove_slice.h"
 #include "app/doc.h"
 #include "app/doc_event.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 
 namespace app { namespace cmd {
@@ -21,11 +23,20 @@ SetTotalFrames::SetTotalFrames(Sprite* sprite, frame_t frames)
   , m_oldFrames(sprite->totalFrames())
   , m_newFrames(frames)
 {
+  for (auto* box : sprite->slices())
+    if (box->isCollisionBox() && box->boxFrame() >= std::max(frame_t(1), frames))
+      m_boxes.add(new RemoveSlice(sprite, box));
 }
 
 void SetTotalFrames::onExecute()
 {
   Sprite* spr = sprite();
+  if (m_firstTime) {
+    m_firstTime = false;
+    m_boxes.execute(context());
+  }
+  else
+    m_boxes.redo();
   spr->setTotalFrames(m_newFrames);
   spr->incrementVersion();
 }
@@ -34,6 +45,7 @@ void SetTotalFrames::onUndo()
 {
   Sprite* spr = sprite();
   spr->setTotalFrames(m_oldFrames);
+  m_boxes.undo();
   spr->incrementVersion();
 }
 

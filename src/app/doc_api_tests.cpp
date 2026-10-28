@@ -15,6 +15,7 @@
 #include "doc/cel.h"
 #include "doc/image.h"
 #include "doc/primitives.h"
+#include "doc/slice.h"
 
 using namespace app;
 using namespace doc;
@@ -146,4 +147,77 @@ TEST_F(BasicDocApiTest, MoveCel)
   EXPECT_EQ(2, cel2->x());
   EXPECT_EQ(-2, cel2->y());
   EXPECT_EQ(128, cel2->opacity());
+}
+
+TEST_F(BasicDocApiTest, CollisionBoxFrameOperationsRollback)
+{
+  sprite->setTotalFrames(4);
+  auto* box = new Slice;
+  box->setKind(SliceKind::Hitbox);
+  box->insert(2, SliceKey(gfx::Rect(1, 2, 3, 4)));
+  sprite->slices().add(box);
+  const auto id = box->id();
+  {
+    Tx tx(sprite, "Insert frame");
+    doc->getApi(tx).addEmptyFrame(sprite, 1);
+    EXPECT_EQ(3, box->boxFrame());
+  }
+  EXPECT_EQ(2, box->boxFrame());
+  {
+    Tx tx(sprite, "Copy frame");
+    doc->getApi(tx).copyFrame(sprite, 2, 0, kDropBeforeFrame, kDefaultTagsAdjustment);
+    EXPECT_EQ(2, sprite->slices().size());
+    EXPECT_EQ(3, box->boxFrame());
+    EXPECT_EQ(0, sprite->slices().begin()[0]->boxFrame());
+  }
+  EXPECT_EQ(1, sprite->slices().size());
+  EXPECT_EQ(2, box->boxFrame());
+  {
+    Tx tx(sprite, "Move frame");
+    doc->getApi(tx).moveFrame(sprite, 2, 0, kDropBeforeFrame, kDefaultTagsAdjustment);
+    EXPECT_EQ(0, box->boxFrame());
+  }
+  EXPECT_EQ(2, box->boxFrame());
+  {
+    Tx tx(sprite, "Move frame forward");
+    doc->getApi(tx).moveFrame(sprite, 2, 3, kDropAfterFrame, kDefaultTagsAdjustment);
+    EXPECT_EQ(3, box->boxFrame());
+  }
+  EXPECT_EQ(2, box->boxFrame());
+  {
+    Tx tx(sprite, "Delete frame");
+    doc->getApi(tx).removeFrame(sprite, 2);
+    EXPECT_TRUE(sprite->slices().empty());
+  }
+  box = sprite->slices().getById(id);
+  ASSERT_NE(nullptr, box);
+  EXPECT_EQ(2, box->boxFrame());
+  {
+    Tx tx(sprite, "Truncate");
+    doc->getApi(tx).setTotalFrames(sprite, 2);
+    EXPECT_TRUE(sprite->slices().empty());
+  }
+  EXPECT_NE(nullptr, sprite->slices().getById(id));
+}
+
+TEST_F(BasicDocApiTest, CropCollisionBoxes)
+{
+  auto* partial = new Slice;
+  partial->setKind(SliceKind::Hurtbox);
+  partial->insert(0, SliceKey(gfx::Rect(1, 1, 4, 4)));
+  sprite->slices().add(partial);
+  auto* outside = new Slice;
+  outside->setKind(SliceKind::Hitbox);
+  outside->insert(0, SliceKey(gfx::Rect(10, 10, 4, 4)));
+  sprite->slices().add(outside);
+  const auto outsideId = outside->id();
+  {
+    Tx tx(sprite, "Crop");
+    doc->getApi(tx).cropSprite(sprite, gfx::Rect(0, 0, 3, 3), true);
+    EXPECT_EQ(1, sprite->slices().size());
+    EXPECT_EQ(gfx::Rect(1, 1, 2, 2), partial->getByFrame(0)->bounds());
+  }
+  EXPECT_EQ(2, sprite->slices().size());
+  EXPECT_NE(nullptr, sprite->slices().getById(outsideId));
+  EXPECT_EQ(gfx::Rect(1, 1, 4, 4), partial->getByFrame(0)->bounds());
 }

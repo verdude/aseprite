@@ -11,11 +11,13 @@
 #include "app/cmd/add_frame.h"
 
 #include "app/cmd/add_cel.h"
+#include "app/cmd/set_box_frame.h"
 #include "app/doc.h"
 #include "app/doc_event.h"
 #include "doc/cel.h"
 #include "doc/layer.h"
 #include "doc/primitives.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 
 namespace app { namespace cmd {
@@ -27,6 +29,9 @@ AddFrame::AddFrame(Sprite* sprite, frame_t newFrame)
   , m_newFrame(newFrame)
   , m_addCel(nullptr)
 {
+  for (auto* box : sprite->slices())
+    if (box->isCollisionBox() && box->boxFrame() >= newFrame)
+      m_boxFrames.add(new SetBoxFrame(box, box->boxFrame() + 1));
 }
 
 void AddFrame::onExecute()
@@ -34,6 +39,12 @@ void AddFrame::onExecute()
   Sprite* sprite = this->sprite();
   auto doc = static_cast<Doc*>(sprite->document());
 
+  if (m_firstTime) {
+    m_firstTime = false;
+    m_boxFrames.execute(context());
+  }
+  else
+    m_boxFrames.redo();
   sprite->addFrame(m_newFrame);
   sprite->incrementVersion();
 
@@ -67,6 +78,7 @@ void AddFrame::onUndo()
     m_addCel->undo();
 
   sprite->removeFrame(m_newFrame);
+  m_boxFrames.undo();
   sprite->incrementVersion();
 
   // Notify observers about the new frame.

@@ -23,6 +23,7 @@
 
 #include "tinyxml2.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <set>
@@ -186,6 +187,8 @@ void update_xml_slice(const doc::Slice* slice, XMLElement* xmlSlice)
     xmlSlice->SetAttribute("text", slice->userData().text().c_str());
   else if (xmlSlice->Attribute("text"))
     xmlSlice->DeleteAttribute("text");
+  if (slice->isCollisionBox())
+    xmlSlice->SetAttribute("kind", slice->kind() == SliceKind::Hitbox ? "hitbox" : "hurtbox");
   xmlSlice->SetAttribute("color", color_to_hex(slice->userData().color()).c_str());
 
   // Update <key> elements
@@ -310,6 +313,10 @@ void load_aseprite_data_file(const std::string& dataFilename,
   }
   // Load slices from <slice> elements
   else if (xmlSlices) {
+    const bool hasCollisionBoxes = std::any_of(
+      doc->sprite()->slices().begin(),
+      doc->sprite()->slices().end(),
+      [](const Slice* slice) { return slice->isCollisionBox(); });
     for (XMLElement* xmlSlice = (xmlSlices->FirstChildElement("slice") ?
                                    xmlSlices->FirstChildElement("slice")->ToElement() :
                                    nullptr);
@@ -319,12 +326,23 @@ void load_aseprite_data_file(const std::string& dataFilename,
       if (!sliceId)
         continue;
 
+      // Native collision data is authoritative; sidecars must not duplicate it.
+      if (hasCollisionBoxes && xmlSlice->Attribute("kind"))
+        continue;
+
       // If the document already contains a slice with this name, use the one from the document
-      if (doc->sprite()->slices().getByName(sliceId))
+      if (!xmlSlice->Attribute("kind") && doc->sprite()->slices().getByName(sliceId))
         continue;
 
       auto slice = new doc::Slice();
-      slice->setName(sliceId);
+      slice->setName(xmlSlice->Attribute("name") ? xmlSlice->Attribute("name") : sliceId);
+
+      if (const char* kind = xmlSlice->Attribute("kind")) {
+        if (std::strcmp(kind, "hitbox") == 0)
+          slice->setKind(SliceKind::Hitbox);
+        else if (std::strcmp(kind, "hurtbox") == 0)
+          slice->setKind(SliceKind::Hurtbox);
+      }
 
       // Slice text
       if (xmlSlice->Attribute("text"))
@@ -402,8 +420,12 @@ void save_aseprite_data_file(const std::string& dataFilename, const doc::Documen
     XMLElement* xmlParts =
       themeHandle.FirstChildElement("theme").FirstChildElement("parts").ToElement();
 
+    std::vector<Slice*> regularSlices;
+    for (auto* slice : doc->sprite()->slices())
+      if (!slice->isCollisionBox())
+        regularSlices.push_back(slice);
     update_xml_collection(
-      doc->sprite()->slices(),
+      regularSlices,
       xmlParts,
       "part",
       "id",
@@ -423,13 +445,34 @@ void save_aseprite_data_file(const std::string& dataFilename, const doc::Documen
   }
   // <slices> without "theme" attribute
   else if (xmlSlices) {
+    // Rebuild collision nodes; their names need not be unique across frames.
+    for (auto* node = xmlSlices->FirstChildElement("slice"); node;) {
+      auto* next = node->NextSiblingElement("slice");
+      if (node->Attribute("kind"))
+        xmlSlices->DeleteChild(node);
+      node = next;
+    }
+    std::vector<Slice*> regularSlices;
+    for (auto* slice : doc->sprite()->slices())
+      if (!slice->isCollisionBox())
+        regularSlices.push_back(slice);
     update_xml_collection(
-      doc->sprite()->slices(),
+      regularSlices,
       xmlSlices,
       "slice",
       "id",
       [](const Slice* slice) -> std::string { return slice->name(); },
       update_xml_slice);
+
+    int boxIndex = 0;
+    for (auto* box : doc->sprite()->slices()) {
+      if (!box->isCollisionBox() || box->empty())
+        continue;
+      auto* node = xmlSlices->InsertNewChildElement("slice");
+      node->SetAttribute("id", ("collision-" + std::to_string(++boxIndex)).c_str());
+      node->SetAttribute("name", box->name().c_str());
+      update_xml_slice(box, node);
+    }
 
     // Save .aseprite-data file
     save_xml(xmlDoc.get(), dataFilename);

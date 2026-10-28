@@ -94,6 +94,7 @@ void SaveFileBaseCommand::onLoadParams(const Params& params)
 {
   CommandWithNewParams<SaveFileParams>::onLoadParams(params);
 
+  m_framesSeq.clear();
   if (this->params().fromFrame.isSet() || this->params().toFrame.isSet()) {
     doc::frame_t fromFrame = this->params().fromFrame();
     doc::frame_t toFrame = this->params().toFrame();

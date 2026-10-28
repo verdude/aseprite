@@ -9,14 +9,14 @@
   #include "config.h"
 #endif
 
-#include "app/commands/cmd_flip.h"
-
 #include "app/app.h"
 #include "app/cmd/flip_mask.h"
 #include "app/cmd/flip_masked_cel.h"
 #include "app/cmd/set_cel_bounds.h"
 #include "app/cmd/set_mask_position.h"
+#include "app/cmd/set_slice_key.h"
 #include "app/cmd/trim_cel.h"
+#include "app/commands/cmd_flip.h"
 #include "app/commands/params.h"
 #include "app/context_access.h"
 #include "app/doc_api.h"
@@ -36,6 +36,7 @@
 #include "doc/image.h"
 #include "doc/layer.h"
 #include "doc/mask.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 
 namespace app {
@@ -185,6 +186,21 @@ void FlipCommand::onExecute(Context* ctx)
       }
 
       api.flipImage(image, image->bounds(), m_flipType);
+    }
+  }
+
+  if (!m_flipMask) {
+    for (auto* box : sprite->slices()) {
+      if (!box->isCollisionBox() || box->empty())
+        continue;
+      auto key = *box->begin()->value();
+      auto bounds = key.bounds();
+      if (m_flipType == doc::algorithm::FlipHorizontal)
+        bounds.x = sprite->width() - bounds.x2();
+      else
+        bounds.y = sprite->height() - bounds.y2();
+      key.setBounds(bounds);
+      tx(new cmd::SetSliceKey(box, box->boxFrame(), key));
     }
   }
 

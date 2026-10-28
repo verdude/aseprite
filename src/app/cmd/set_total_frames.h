@@ -10,6 +10,7 @@
 
 #include "app/cmd.h"
 #include "app/cmd/with_sprite.h"
+#include "app/cmd_sequence.h"
 #include "doc/frame.h"
 
 namespace app { namespace cmd {
@@ -24,9 +25,11 @@ protected:
   void onExecute() override;
   void onUndo() override;
   void onFireNotifications() override;
-  size_t onMemSize() const override { return sizeof(*this); }
+  size_t onMemSize() const override { return sizeof(*this) + m_boxes.memSize(); }
 
 private:
+  CmdSequence m_boxes;
+  bool m_firstTime = true;
   frame_t m_oldFrames;
   frame_t m_newFrames;
 };

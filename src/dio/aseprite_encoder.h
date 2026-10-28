@@ -108,7 +108,8 @@ private:
   void writeSliceChunk(AsepriteFrameHeader* frame_header,
                        doc::Slice* slice,
                        const doc::frame_t fromFrame,
-                       const doc::frame_t toFrame);
+                       const doc::frame_t toFrame,
+                       const doc::frame_t outputFrame = -1);
   void writeUserDataChunk(AsepriteFrameHeader* frame_header,
                           const AsepriteExternalFiles& ext_files,
                           const doc::UserData* userData);

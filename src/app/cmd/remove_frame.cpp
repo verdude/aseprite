@@ -11,9 +11,12 @@
 #include "app/cmd/remove_frame.h"
 
 #include "app/cmd/remove_cel.h"
+#include "app/cmd/remove_slice.h"
+#include "app/cmd/set_box_frame.h"
 #include "app/doc.h"
 #include "app/doc_event.h"
 #include "doc/cels_range.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 
 namespace app { namespace cmd {
@@ -26,6 +29,14 @@ RemoveFrame::RemoveFrame(Sprite* sprite, frame_t frame)
   , m_firstTime(true)
   , m_frameRemoved(false)
 {
+  for (auto* box : sprite->slices()) {
+    if (!box->isCollisionBox())
+      continue;
+    if (box->boxFrame() == frame)
+      m_seq.add(new RemoveSlice(sprite, box));
+    else if (box->boxFrame() > frame)
+      m_seq.add(new SetBoxFrame(box, box->boxFrame() - 1));
+  }
   m_frameDuration = sprite->frameDuration(frame);
   for (Cel* cel : sprite->cels(m_frame))
     m_seq.add(new cmd::RemoveCel(cel));

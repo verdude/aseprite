@@ -50,6 +50,41 @@ Slice::~Slice()
   ASSERT(!m_owner);
 }
 
+SliceKind Slice::kind() const
+{
+  const auto& maps = userData().propertiesMaps();
+  auto group = maps.find(CollisionData);
+  if (group != maps.end()) {
+    auto it = group->second.find("kind");
+    if (it != group->second.end()) {
+      if (const auto* value = std::get_if<std::string>(&it->second)) {
+        if (*value == "hitbox")
+          return SliceKind::Hitbox;
+        if (*value == "hurtbox")
+          return SliceKind::Hurtbox;
+      }
+    }
+  }
+  return SliceKind::Slice;
+}
+
+void Slice::setKind(SliceKind kind)
+{
+  if (kind == SliceKind::Slice)
+    userData().propertiesMaps().erase(CollisionData);
+  else
+    userData().properties(CollisionData)["kind"] = std::string(
+      kind == SliceKind::Hitbox ? "hitbox" : "hurtbox");
+}
+
+void Slice::setBoxFrame(frame_t frame)
+{
+  ASSERT(isCollisionBox());
+  ASSERT(size() == 1);
+  if (size() == 1)
+    m_keys.begin()->setFrame(frame);
+}
+
 int Slice::getMemSize() const
 {
   return sizeof(*this) + sizeof(SliceKey) * m_keys.size();
@@ -57,18 +92,26 @@ int Slice::getMemSize() const
 
 void Slice::insert(const frame_t frame, const SliceKey& key)
 {
-  m_keys.insert(frame, std::make_unique<SliceKey>(key));
+  if (isCollisionBox()) {
+    // Editing a box must never create a second, inherited geometry key.
+    if (!empty() && frame != boxFrame())
+      return;
+    m_keys.insert(frame, std::make_unique<SliceKey>(key.bounds()));
+  }
+  else
+    m_keys.insert(frame, std::make_unique<SliceKey>(key));
 }
 
 void Slice::remove(const frame_t frame)
 {
-  m_keys.remove(frame);
+  if (!isCollisionBox() || (!empty() && frame == boxFrame()))
+    m_keys.remove(frame);
 }
 
 const SliceKey* Slice::getByFrame(const frame_t frame) const
 {
   auto it = const_cast<Slice*>(this)->m_keys.getIterator(frame);
-  if (it != m_keys.end())
+  if (it != m_keys.end() && (!isCollisionBox() || it->frame() == frame))
     return it->value();
   else
     return nullptr;

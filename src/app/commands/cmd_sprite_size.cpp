@@ -242,7 +242,12 @@ protected:
           continue;
 
         SliceKey newKey = key;
-        newKey.setBounds(scale_rect(newKey.bounds()));
+        auto bounds = scale_rect(newKey.bounds());
+        if (slice->isCollisionBox()) {
+          bounds.w = std::max(1, bounds.w);
+          bounds.h = std::max(1, bounds.h);
+        }
+        newKey.setBounds(bounds);
 
         if (newKey.hasCenter())
           newKey.setCenter(scale_rect(newKey.center()));
