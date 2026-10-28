@@ -52,6 +52,7 @@
 #include "app/transaction.h"
 #include "app/tx.h"
 #include "app/ui/doc_view.h"
+#include "app/util/slice_utils.h"
 #include "base/convert_to.h"
 #include "base/fs.h"
 #include "base/gcd.h"
@@ -65,7 +66,6 @@
 #include "doc/tileset.h"
 #include "doc/tilesets.h"
 #include "undo/undo_state.h"
-
 #include <algorithm>
 
 namespace app { namespace script {
@@ -585,6 +585,38 @@ int Sprite_newSlice(lua_State* L)
 
   push_docobj(L, slice);
   return 1;
+}
+
+int Sprite_newCollisionBox(lua_State* L, const doc::SliceKind kind)
+{
+  auto* sprite = get_docobj<Sprite>(L, 1);
+  if (lua_isnoneornil(L, 3))
+    return luaL_error(L, "an explicit frame is required");
+  const auto frame = get_frame_number_from_arg(L, 3);
+  if (frame < 0 || frame >= sprite->totalFrames())
+    return luaL_error(L, "frame index out of bounds");
+  const auto bounds = convert_args_into_rect(L, 2);
+  if (bounds.isEmpty())
+    return luaL_error(L, "collision box bounds must have positive width and height");
+  auto* box = new doc::Slice;
+  box->setKind(kind);
+  box->setName(
+    get_unique_slice_name(sprite, kind == doc::SliceKind::Hitbox ? "Hitbox" : "Hurtbox"));
+  box->insert(frame, doc::SliceKey(bounds));
+  Tx tx(sprite);
+  tx(new cmd::AddSlice(sprite, box));
+  tx.commit();
+  push_docobj(L, box);
+  return 1;
+}
+
+int Sprite_newHitbox(lua_State* L)
+{
+  return Sprite_newCollisionBox(L, doc::SliceKind::Hitbox);
+}
+int Sprite_newHurtbox(lua_State* L)
+{
+  return Sprite_newCollisionBox(L, doc::SliceKind::Hurtbox);
 }
 
 int Sprite_deleteSlice(lua_State* L)
@@ -1109,6 +1141,8 @@ const luaL_Reg Sprite_methods[] = {
   { "newTag",            Sprite_newTag            },
   { "deleteTag",         Sprite_deleteTag         },
   // Slices
+  { "newHitbox",         Sprite_newHitbox         },
+  { "newHurtbox",        Sprite_newHurtbox        },
   { "newSlice",          Sprite_newSlice          },
   { "deleteSlice",       Sprite_deleteSlice       },
   // Tilesets & Tiles

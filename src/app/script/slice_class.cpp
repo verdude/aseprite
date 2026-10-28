@@ -9,8 +9,10 @@
   #include "config.h"
 #endif
 
+#include "app/cmd/set_box_kind.h"
 #include "app/cmd/set_slice_key.h"
 #include "app/cmd/set_slice_name.h"
+#include "app/pref/preferences.h"
 #include "app/script/docobj.h"
 #include "app/script/engine.h"
 #include "app/script/luacpp.h"
@@ -40,6 +42,53 @@ int Slice_get_sprite(lua_State* L)
   return 1;
 }
 
+int Slice_get_kind(lua_State* L)
+{
+  auto* slice = get_docobj<Slice>(L, 1);
+  lua_pushstring(L,
+                 slice->kind() == SliceKind::Hitbox  ? "hitbox" :
+                 slice->kind() == SliceKind::Hurtbox ? "hurtbox" :
+                                                       "slice");
+  return 1;
+}
+int Slice_set_kind(lua_State* L)
+{
+  auto* slice = get_docobj<Slice>(L, 1);
+  const std::string kind = luaL_checkstring(L, 2);
+  if (!slice->isCollisionBox() || (kind != "hitbox" && kind != "hurtbox"))
+    return luaL_error(L, "only hitbox/hurtbox type changes are supported");
+  Tx tx(slice->sprite());
+  tx(new cmd::SetBoxKind(slice, kind == "hitbox" ? SliceKind::Hitbox : SliceKind::Hurtbox));
+  tx.commit();
+  return 0;
+}
+int Slice_get_frame(lua_State* L)
+{
+  auto* slice = get_docobj<Slice>(L, 1);
+  if (slice->isCollisionBox())
+    push_sprite_frame(L, slice->sprite(), slice->boxFrame());
+  else
+    lua_pushnil(L);
+  return 1;
+}
+int Slice_get_color(lua_State* L)
+{
+  auto* slice = get_docobj<Slice>(L, 1);
+  if (!slice->isCollisionBox())
+    return UserData_get_color<Slice>(L);
+  auto& pref = Preferences::instance().collision;
+  push_obj<app::Color>(
+    L,
+    slice->kind() == SliceKind::Hitbox ? pref.hitboxColor() : pref.hurtboxColor());
+  return 1;
+}
+int Slice_set_color(lua_State* L)
+{
+  if (get_docobj<Slice>(L, 1)->isCollisionBox())
+    return luaL_error(L, "collision colors are configured by type in Preferences");
+  return UserData_set_color<Slice>(L);
+}
+
 int Slice_get_name(lua_State* L)
 {
   auto slice = get_docobj<Slice>(L, 1);
@@ -60,7 +109,7 @@ int Slice_get_bounds(lua_State* L)
 int Slice_get_center(lua_State* L)
 {
   auto slice = get_docobj<Slice>(L, 1);
-  if (!slice->empty() && slice->begin()->value()->hasCenter())
+  if (!slice->isCollisionBox() && !slice->empty() && slice->begin()->value()->hasCenter())
     push_new<gfx::Rect>(L, slice->begin()->value()->center());
   else
     lua_pushnil(L);
@@ -70,7 +119,7 @@ int Slice_get_center(lua_State* L)
 int Slice_get_pivot(lua_State* L)
 {
   auto slice = get_docobj<Slice>(L, 1);
-  if (!slice->empty() && slice->begin()->value()->hasPivot())
+  if (!slice->isCollisionBox() && !slice->empty() && slice->begin()->value()->hasPivot())
     push_new<gfx::Point>(L, slice->begin()->value()->pivot());
   else
     lua_pushnil(L);
@@ -93,12 +142,15 @@ int Slice_set_bounds(lua_State* L)
 {
   auto slice = get_docobj<Slice>(L, 1);
   gfx::Rect bounds = convert_args_into_rect(L, 2);
+  if (slice->isCollisionBox() && bounds.isEmpty())
+    return luaL_error(L, "collision box bounds must have positive width and height");
+  const auto frame = slice->isCollisionBox() ? slice->boxFrame() : 0;
   SliceKey key;
-  if (const SliceKey* srcKey = slice->getByFrame(0))
+  if (const SliceKey* srcKey = slice->getByFrame(frame))
     key = *srcKey;
   key.setBounds(bounds);
   Tx tx(slice->sprite());
-  tx(new cmd::SetSliceKey(slice, 0, key));
+  tx(new cmd::SetSliceKey(slice, frame, key));
   tx.commit();
   return 0;
 }
@@ -106,6 +158,8 @@ int Slice_set_bounds(lua_State* L)
 int Slice_set_center(lua_State* L)
 {
   auto slice = get_docobj<Slice>(L, 1);
+  if (slice->isCollisionBox())
+    return luaL_error(L, "collision boxes do not have a center");
   gfx::Rect center = convert_args_into_rect(L, 2);
   SliceKey key;
   if (const SliceKey* srcKey = slice->getByFrame(0))
@@ -120,6 +174,8 @@ int Slice_set_center(lua_State* L)
 int Slice_set_pivot(lua_State* L)
 {
   auto slice = get_docobj<Slice>(L, 1);
+  if (slice->isCollisionBox())
+    return luaL_error(L, "collision boxes do not have a pivot");
   gfx::Point pivot = convert_args_into_point(L, 2);
   SliceKey key;
   if (const SliceKey* srcKey = slice->getByFrame(0))
@@ -137,12 +193,14 @@ const luaL_Reg Slice_methods[] = {
 };
 
 const Property Slice_properties[] = {
+  { "kind",       Slice_get_kind,                 Slice_set_kind                 },
+  { "frame",      Slice_get_frame,                nullptr                        },
   { "sprite",     Slice_get_sprite,               nullptr                        },
   { "name",       Slice_get_name,                 Slice_set_name                 },
   { "bounds",     Slice_get_bounds,               Slice_set_bounds               },
   { "center",     Slice_get_center,               Slice_set_center               },
   { "pivot",      Slice_get_pivot,                Slice_set_pivot                },
-  { "color",      UserData_get_color<Slice>,      UserData_set_color<Slice>      },
+  { "color",      Slice_get_color,                Slice_set_color                },
   { "data",       UserData_get_text<Slice>,       UserData_set_text<Slice>       },
   { "properties", UserData_get_properties<Slice>, UserData_set_properties<Slice> },
   { nullptr,      nullptr,                        nullptr                        }

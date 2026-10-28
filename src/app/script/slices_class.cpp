@@ -39,7 +39,11 @@ int Slices_gc(lua_State* L)
 int Slices_len(lua_State* L)
 {
   auto obj = get_obj<SlicesObj>(L, 1);
-  lua_pushinteger(L, obj->sprite(L)->slices().size());
+  int count = 0;
+  for (const auto* slice : obj->sprite(L)->slices())
+    if (!slice->isCollisionBox())
+      ++count;
+  lua_pushinteger(L, count);
   return 1;
 }
 
@@ -48,10 +52,14 @@ int Slices_index(lua_State* L)
   auto obj = get_obj<SlicesObj>(L, 1);
   auto& slices = obj->sprite(L)->slices();
   const int i = lua_tonumber(L, 2);
-  if (i >= 1 && i <= int(slices.size()))
-    push_docobj(L, *(slices.begin() + i - 1));
-  else
-    lua_pushnil(L);
+  int index = 0;
+  for (auto* slice : slices) {
+    if (!slice->isCollisionBox() && ++index == i) {
+      push_docobj(L, slice);
+      return 1;
+    }
+  }
+  lua_pushnil(L);
   return 1;
 }
 

@@ -16,6 +16,7 @@
 #include "app/script/luacpp.h"
 #include "app/tx.h"
 #include "doc/frame.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 
 namespace app { namespace script {
@@ -94,6 +95,28 @@ int Frame_get_next(lua_State* L)
   return 1;
 }
 
+int Frame_get_boxes(lua_State* L, const doc::SliceKind kind)
+{
+  auto* obj = get_obj<FrameObj>(L, 1);
+  lua_newtable(L);
+  int index = 1;
+  for (auto* slice : obj->sprite(L)->slices()) {
+    if (slice->kind() != kind || !slice->getByFrame(obj->frame))
+      continue;
+    push_docobj(L, slice);
+    lua_rawseti(L, -2, index++);
+  }
+  return 1;
+}
+int Frame_get_hitboxes(lua_State* L)
+{
+  return Frame_get_boxes(L, doc::SliceKind::Hitbox);
+}
+int Frame_get_hurtboxes(lua_State* L)
+{
+  return Frame_get_boxes(L, doc::SliceKind::Hurtbox);
+}
+
 int Frame_set_duration(lua_State* L)
 {
   auto obj = get_obj<FrameObj>(L, 1);
@@ -112,6 +135,8 @@ const luaL_Reg Frame_methods[] = {
 };
 
 const Property Frame_properties[] = {
+  { "hitboxes",    Frame_get_hitboxes,    nullptr            },
+  { "hurtboxes",   Frame_get_hurtboxes,   nullptr            },
   { "sprite",      Frame_get_sprite,      nullptr            },
   { "frameNumber", Frame_get_frameNumber, nullptr            },
   { "duration",    Frame_get_duration,    Frame_set_duration },
