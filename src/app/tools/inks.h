@@ -271,15 +271,19 @@ public:
 };
 
 class SliceInk : public BaseInk {
+  bool m_collisionBox;
   bool m_createSlice;
   gfx::Rect m_maxBounds;
 
 public:
-  SliceInk() : m_createSlice(false) {}
+  explicit SliceInk(bool collisionBox = false) : m_collisionBox(collisionBox), m_createSlice(false)
+  {
+  }
 
   Ink* clone() override { return new SliceInk(*this); }
 
   bool isSlice() const override { return true; }
+  bool isCollisionBox() const override { return m_collisionBox; }
   bool needsCelCoordinates() const override { return (m_createSlice ? false : true); }
 
   void prepareInk(ToolLoop* loop) override { setProc(get_ink_proc<XorInkProcessing>(loop)); }

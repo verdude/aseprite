@@ -180,6 +180,41 @@ protected:
   }
 };
 
+class ShowCollisionBoxesCommand : public Command {
+public:
+  explicit ShowCollisionBoxesCommand(bool hurtboxes)
+    : Command(hurtboxes ? CommandId::ShowHurtboxes() : CommandId::ShowHitboxes())
+    , m_hurtboxes(hurtboxes)
+  {
+  }
+
+protected:
+  bool onChecked(Context* ctx) override
+  {
+    auto& show = Preferences::instance().document(ctx->activeDocument()).show;
+    return m_hurtboxes ? show.hurtboxes() : show.hitboxes();
+  }
+  void onExecute(Context* ctx) override
+  {
+    auto& show = Preferences::instance().document(ctx->activeDocument()).show;
+    if (m_hurtboxes)
+      show.hurtboxes(!show.hurtboxes());
+    else
+      show.hitboxes(!show.hitboxes());
+  }
+
+private:
+  bool m_hurtboxes;
+};
+Command* CommandFactory::createShowHitboxesCommand()
+{
+  return new ShowCollisionBoxesCommand(false);
+}
+Command* CommandFactory::createShowHurtboxesCommand()
+{
+  return new ShowCollisionBoxesCommand(true);
+}
+
 class ShowSlicesCommand : public Command {
 public:
   ShowSlicesCommand() : Command(CommandId::ShowSlices()) {}

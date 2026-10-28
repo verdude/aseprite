@@ -518,6 +518,9 @@ void DocView::onNewInputPriority(InputChainElement* element, const ui::Message* 
 
 bool DocView::onCanCut(Context* ctx)
 {
+  const auto slices = get_selected_slices(ctx->activeSite());
+  if (!slices.empty() && slices.front()->isCollisionBox())
+    return ctx->checkFlags(ContextFlags::ActiveDocumentIsWritable);
   if (ctx->checkFlags(ContextFlags::ActiveDocumentIsWritable | ContextFlags::ActiveLayerIsVisible |
                       ContextFlags::ActiveLayerIsEditable | ContextFlags::HasVisibleMask |
                       ContextFlags::HasActiveImage) &&
@@ -568,6 +571,8 @@ bool DocView::onCanPaste(Context* ctx)
 
 bool DocView::onCanClear(Context* ctx)
 {
+  if (!ctx->activeSite().selectedSlices().empty())
+    return ctx->checkFlags(ContextFlags::ActiveDocumentIsWritable);
   if (ctx->checkFlags(ContextFlags::ActiveDocumentIsWritable | ContextFlags::ActiveLayerIsVisible |
                       ContextFlags::ActiveLayerIsEditable | ContextFlags::ActiveLayerIsImage) &&
       !ctx->checkFlags(ContextFlags::ActiveLayerIsReference)) {
@@ -582,6 +587,12 @@ bool DocView::onCanClear(Context* ctx)
 
 bool DocView::onCut(Context* ctx)
 {
+  const auto slices = get_selected_slices(ctx->activeSite());
+  if (!slices.empty() && slices.front()->isCollisionBox()) {
+    ctx->clipboard()->copySlices(slices);
+    ctx->executeCommand(Commands::instance()->byId(CommandId::RemoveSlice()));
+    return true;
+  }
   ContextWriter writer(ctx);
   ctx->clipboard()->cut(writer);
   return true;
@@ -590,13 +601,17 @@ bool DocView::onCut(Context* ctx)
 bool DocView::onCopy(Context* ctx)
 {
   const ContextReader reader(ctx);
+  std::vector<Slice*> selectedSlices = get_selected_slices(reader.site());
+  if (!selectedSlices.empty() && selectedSlices.front()->isCollisionBox()) {
+    ctx->clipboard()->copySlices(selectedSlices);
+    return true;
+  }
   if (reader.site().document() &&
       static_cast<const Doc*>(reader.site().document())->isMaskVisible() && reader.site().image()) {
     ctx->clipboard()->copy(reader);
     return true;
   }
 
-  std::vector<Slice*> selectedSlices = get_selected_slices(reader.site());
   if (!selectedSlices.empty()) {
     ctx->clipboard()->copySlices(selectedSlices);
     return true;

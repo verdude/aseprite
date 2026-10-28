@@ -382,6 +382,11 @@
       <option id="layer_edges_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255)" />
       <option id="auto_guides_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255, 128)" />
     </section>
+    <section id="collision">
+      <option id="hitbox_color" type="app::Color" default="app::Color::fromRgb(255, 0, 0)" />
+      <option id="hurtbox_color" type="app::Color" default="app::Color::fromRgb(0, 255, 0)" />
+      <option id="create_hurtbox" type="bool" default="false" />
+    </section>
     <section id="slices">
       <option id="default_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255)" />
       <option id="user_data_visibility" type="bool" default="false" />
@@ -639,6 +644,8 @@
       <option id="pixel_grid" type="bool" default="false" />
       <option id="brush_preview" type="bool" default="true" />
       <option id="slices" type="bool" default="true" />
+      <option id="hitboxes" type="bool" default="true" />
+      <option id="hurtboxes" type="bool" default="true" />
       <option id="auto_guides" type="bool" default="true" />
       <option id="tile_numbers" type="bool" default="true" />
     </section>

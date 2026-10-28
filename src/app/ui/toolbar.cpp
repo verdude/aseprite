@@ -12,6 +12,7 @@
 #include "app/ui/toolbar.h"
 
 #include "app/app.h"
+#include "app/color_utils.h"
 #include "app/commands/command.h"
 #include "app/commands/commands.h"
 #include "app/i18n/strings.h"
@@ -88,6 +89,8 @@ ToolBar* ToolBar::m_instance = NULL;
 ToolBar::ToolBar() : Widget(kGenericWidget), m_openedRecently(false), m_tipTimer(300, this)
 {
   m_instance = this;
+  m_boxColorsConn = App::instance()->preferences().collision.AfterChange.connect(
+    [this] { invalidate(); });
 
   auto tooltipDelay = [this] {
     m_tipTimer.setInterval(App::instance()->preferences().experimental.tooltipDelay());
@@ -368,6 +371,17 @@ void ToolBar::onPaint(ui::PaintEvent& ev)
     // Draw the tool icon
     icon = theme->getToolIcon(tool->getId().c_str());
     drawToolIcon(g, c, nw, icon);
+    if (tool->getId() == "collision") {
+      const auto& colors = App::instance()->preferences().collision;
+      Rect rc = getToolGroupBounds(c);
+      rc.offset(-this->bounds().origin());
+      g->drawRect(
+        color_utils::color_for_ui(colors.hitboxColor()),
+        Rect(rc.x + 3 * guiscale(), rc.y2() - 5 * guiscale(), 4 * guiscale(), 3 * guiscale()));
+      g->drawRect(
+        color_utils::color_for_ui(colors.hurtboxColor()),
+        Rect(rc.x + 8 * guiscale(), rc.y2() - 5 * guiscale(), 4 * guiscale(), 3 * guiscale()));
+    }
   }
 
   if (hiddenGroups > 0) {

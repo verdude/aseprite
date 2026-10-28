@@ -56,6 +56,7 @@ public:
   Menu* getCelPopupMenu() { return m_celPopupMenu.get(); }
   Menu* getCelMovementPopupMenu() { return m_celMovementPopupMenu.get(); }
   Menu* getTagPopupMenu() { return m_tagPopupMenu.get(); }
+  Menu* getCollisionPopupMenu() { return m_collisionPopupMenu.get(); }
   Menu* getSlicePopupMenu() { return m_slicePopupMenu.get(); }
   Menu* getPalettePopupMenu() { return m_palettePopupMenu.get(); }
   Menu* getInkPopupMenu() { return m_inkPopupMenu.get(); }
@@ -112,6 +113,7 @@ private:
   std::unique_ptr<Menu> m_celPopupMenu;
   std::unique_ptr<Menu> m_celMovementPopupMenu;
   std::unique_ptr<Menu> m_tagPopupMenu;
+  std::unique_ptr<Menu> m_collisionPopupMenu;
   std::unique_ptr<Menu> m_slicePopupMenu;
   std::unique_ptr<Menu> m_palettePopupMenu;
   std::unique_ptr<Menu> m_inkPopupMenu;

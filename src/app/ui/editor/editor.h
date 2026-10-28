@@ -299,14 +299,16 @@ public:
   bool startStraightLineWithFreehandTool(const tools::Pointer* pointer);
 
   // Functions to handle the set of selected slices.
+  bool isSliceVisible(const doc::Slice* slice) const;
+  bool canSelectSlice(const doc::Slice* slice) const;
   bool isSliceSelected(const doc::Slice* slice) const;
   void clearSlicesSelection();
   void selectSlice(const doc::Slice* slice);
   bool selectSliceBox(const gfx::Rect& box);
   void selectAllSlices();
-  bool hasSelectedSlices() const { return !m_selectedSlices.empty(); }
+  bool hasSelectedSlices() const;
   void slicesTransforms(bool value) { m_slicesTransforms = value; }
-  bool slicesTransforms() const { return m_slicesTransforms; }
+  bool slicesTransforms() const;
 
   // Called by DocView's InputChainElement::onCancel() impl when Esc
   // key is pressed to cancel the active selection.
@@ -455,6 +457,7 @@ private:
   obs::scoped_connection m_fgColorChangeConn;
   obs::scoped_connection m_contextBarBrushChangeConn;
   obs::scoped_connection m_showExtrasConn;
+  obs::scoped_connection m_collisionColorsConn;
 
   // Slots listening document preferences.
   obs::scoped_connection m_tiledConnBefore;

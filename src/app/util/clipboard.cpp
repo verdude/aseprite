@@ -9,6 +9,8 @@
   #include "config.h"
 #endif
 
+#include "app/util/clipboard.h"
+
 #include "app/app.h"
 #include "app/cmd/add_slice.h"
 #include "app/cmd/add_tileset.h"
@@ -26,6 +28,8 @@
 #include "app/modules/gfx.h"
 #include "app/modules/gui.h"
 #include "app/pref/preferences.h"
+#include "app/tools/active_tool.h"
+#include "app/tools/tool_box.h"
 #include "app/tx.h"
 #include "app/ui/color_bar.h"
 #include "app/ui/editor/editor.h"
@@ -33,7 +37,6 @@
 #include "app/ui/timeline/timeline.h"
 #include "app/ui_context.h"
 #include "app/util/cel_ops.h"
-#include "app/util/clipboard.h"
 #include "app/util/new_image_from_mask.h"
 #include "app/util/slice_utils.h"
 #include "clip/clip.h"
@@ -730,6 +733,15 @@ void Clipboard::paste(Context* ctx, const bool interactive, const gfx::Point* po
             api.addEmptyFrame(dstSpr, dstFrame);
             api.setFrameDuration(dstSpr, dstFrame, srcSpr->frameDuration(srcFrame));
 
+            for (auto it = srcSpr->slices().end(); it != srcSpr->slices().begin();) {
+              auto* box = *--it;
+              if (box->isCollisionBox() && box->getByFrame(srcFrame)) {
+                auto* copy = new Slice(*box);
+                copy->setBoxFrame(dstFrame);
+                tx(new cmd::AddSlice(dstSpr, copy));
+              }
+            }
+
             auto srcIt = srcLayers.begin();
             auto dstIt = dstLayers.begin();
             auto srcEnd = srcLayers.end();
@@ -815,9 +827,19 @@ void Clipboard::paste(Context* ctx, const bool interactive, const gfx::Point* po
 
       ContextWriter writer(ctx);
       Tx tx(writer, Strings::tx_paste_slices());
+      if (slices.front().isCollisionBox())
+        App::instance()->activeToolManager()->setSelectedTool(
+          App::instance()->toolBox()->getToolById("collision"));
       editor->clearSlicesSelection();
       for (auto& s : slices) {
         Slice* slice = new Slice(s);
+        if (slice->isCollisionBox()) {
+          slice->setBoxFrame(editor->frame());
+          if (slice->kind() == SliceKind::Hitbox)
+            editor->docPref().show.hitboxes(true);
+          else
+            editor->docPref().show.hurtboxes(true);
+        }
         slice->setName(Strings::general_copy_of(slice->name()));
         tx(new cmd::AddSlice(dstSpr, slice));
         editor->selectSlice(slice);

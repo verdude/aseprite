@@ -121,6 +121,7 @@ private:
   int m_minHeight;
 
   obs::connection m_closeConn;
+  obs::scoped_connection m_boxColorsConn;
 };
 
 } // namespace app

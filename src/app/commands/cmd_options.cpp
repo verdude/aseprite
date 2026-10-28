@@ -670,6 +670,8 @@ public:
 
     // Slices default color
     defaultSliceColor()->setColor(m_pref.slices.defaultColor());
+    hitboxColor()->setColor(m_pref.collision.hitboxColor());
+    hurtboxColor()->setColor(m_pref.collision.hurtboxColor());
 
     // Tooltip Delay
     tooltipDelay()->setTextf("%d", m_pref.experimental.tooltipDelay());
@@ -890,6 +892,8 @@ public:
     m_pref.guides.layerEdgesColor(layerEdgesColor()->getColor());
     m_pref.guides.autoGuidesColor(autoGuidesColor()->getColor());
     m_pref.slices.defaultColor(defaultSliceColor()->getColor());
+    m_pref.collision.hitboxColor(hitboxColor()->getColor());
+    m_pref.collision.hurtboxColor(hurtboxColor()->getColor());
 
     m_pref.color.workingRgbSpace(
       workingRgbCs()->getItemText(workingRgbCs()->getSelectedItemIndex()));

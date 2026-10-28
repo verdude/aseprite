@@ -139,6 +139,7 @@ ToolBox::ToolBox()
   m_inks[WellKnownInks::Move] = new MoveInk(false);
   m_inks[WellKnownInks::SelectLayerAndMove] = new MoveInk(true);
   m_inks[WellKnownInks::Slice] = new SliceInk();
+  m_inks["collision"] = new SliceInk(true);
   m_inks[WellKnownInks::Blur] = new BlurInk();
   m_inks[WellKnownInks::Jumble] = new JumbleInk();
   m_inks[WellKnownInks::Text] = new TextInk();

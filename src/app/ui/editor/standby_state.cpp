@@ -239,7 +239,9 @@ bool StandbyState::onMouseDown(Editor* editor, MouseMessage* msg)
           editor->setState(EditorStatePtr(newState));
         }
         else {
-          Menu* popupMenu = AppMenus::instance()->getSlicePopupMenu();
+          Menu* popupMenu = clickedInk->isCollisionBox() ?
+                              AppMenus::instance()->getCollisionPopupMenu() :
+                              AppMenus::instance()->getSlicePopupMenu();
           if (popupMenu) {
             Params params;
             // When the editor doesn't have a set of selected slices,
@@ -579,9 +581,11 @@ bool StandbyState::onUpdateStatusBar(Editor* editor)
       }
     }
 
-    if (editor->docPref().show.slices()) {
+    {
       int count = 0;
       for (auto slice : editor->document()->sprite()->slices()) {
+        if (!editor->isSliceVisible(slice))
+          continue;
         auto key = slice->getByFrame(editor->frame());
         if (key &&
             key->bounds().contains(int(std::floor(spritePos.x)), int(std::floor(spritePos.y)))) {

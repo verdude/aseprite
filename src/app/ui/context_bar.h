@@ -127,6 +127,7 @@ protected:
   void onAddSlice(DocEvent& ev) override;
   void onRemoveSlice(DocEvent& ev) override;
   void onSliceNameChange(DocEvent& ev) override;
+  void onGeneralUpdate(DocEvent& ev) override;
 
 private:
   void onBrushSizeChange();

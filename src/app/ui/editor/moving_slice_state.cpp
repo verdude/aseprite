@@ -38,7 +38,8 @@ MovingSliceState::MovingSliceState(Editor* editor,
                                    const EditorHit& hit,
                                    const doc::SelectedObjects& selectedSlices)
   : m_frame(editor->frame())
-  , m_keyFrame(Preferences::instance().slices.useKeys() ? m_frame : 0)
+  , m_keyFrame(hit.slice()->isCollisionBox() || Preferences::instance().slices.useKeys() ? m_frame :
+                                                                                           0)
   , m_hit(hit)
   , m_items(std::max<std::size_t>(1, selectedSlices.size()))
   , m_tx(Tx::DontLockDoc,
@@ -71,7 +72,7 @@ MovingSliceState::MovingSliceState(Editor* editor,
   editor->getSite(&m_site);
   // Prevent using different tilemap and tileset modes when the last selected
   // layer is not a tilemap.
-  if (!m_site.layer()->isTilemap()) {
+  if (!m_site.layer() || !m_site.layer()->isTilemap()) {
     m_site.tilemapMode(TilemapMode::Pixels);
     m_site.tilesetMode(TilesetMode::Auto);
   }

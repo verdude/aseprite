@@ -12,6 +12,7 @@
 #include "app/ui/slice_window.h"
 
 #include "app/doc.h"
+#include "app/i18n/strings.h"
 #include "app/pref/preferences.h"
 #include "app/ui/user_data_view.h"
 #include "doc/slice.h"
@@ -33,6 +34,25 @@ SliceWindow::SliceWindow(const doc::Sprite* sprite,
   Slice* slice = slices.frontAs<Slice>();
   m_userDataView.configureAndSet(slice->userData(), propertiesGrid());
   userData()->Click.connect([this] { onToggleUserData(); });
+  const bool collision = slice->isCollisionBox();
+  boxKindFields()->setVisible(collision);
+  if (collision) {
+    setText(Strings::collision_properties());
+    userData()->setVisible(false);
+    m_userDataView.setVisible(false, false);
+    center()->setVisible(false);
+    centerX()->parent()->setVisible(false);
+    pivot()->setVisible(false);
+    pivotX()->parent()->setVisible(false);
+    boxKind()->setSelectedItemIndex(slice->kind() == doc::SliceKind::Hitbox ? 0 : 1);
+    for (auto* item : slices.iterateAs<Slice>()) {
+      if (item->kind() != slice->kind()) {
+        boxKind()->setSelectedItemIndex(-1);
+        break;
+      }
+    }
+    boxKind()->Change.connect([this] { onModifyField(nullptr, kBoxKind); });
+  }
 
   if (slices.size() == 1) {
     // If we are going to edit just one slice, we indicate like all
@@ -103,6 +123,11 @@ bool SliceWindow::show()
 {
   openWindowInForeground();
   return (closer() == ok());
+}
+
+doc::SliceKind SliceWindow::boxKindValue() const
+{
+  return boxKind()->getSelectedItemIndex() == 1 ? doc::SliceKind::Hurtbox : doc::SliceKind::Hitbox;
 }
 
 std::string SliceWindow::nameValue() const

@@ -210,6 +210,8 @@ Editor::Editor(Doc* document, EditorFlags flags, EditorStatePtr state)
     [this] { invalidateIfActive(); });
   m_showExtrasConn = m_docPref.show.AfterChange.connect([this] { onShowExtrasChange(); });
 
+  m_collisionColorsConn = Preferences::instance().collision.AfterChange.connect(
+    [this] { invalidate(); });
   m_document->add_observer(this);
 
   m_state->onEnterState(this);
@@ -437,6 +439,9 @@ void Editor::setFrame(frame_t frame)
   m_observers.notifyBeforeFrameChanged(this);
   {
     HideBrushPreview hide(m_brushPreview);
+    for (auto* slice : m_sprite->slices())
+      if (slice->isCollisionBox())
+        m_selectedSlices.erase(slice->id());
     m_frame = frame;
   }
   m_observers.notifyAfterFrameChanged(this);
@@ -458,7 +463,9 @@ void Editor::getSite(Site* site) const
   site->frame(m_frame);
 
   if (!m_selectedSlices.empty() && getCurrentEditorInk()->isSlice()) {
-    site->selectedSlices(m_selectedSlices);
+    for (auto* slice : m_sprite->slices())
+      if (m_selectedSlices.contains(slice->id()) && canSelectSlice(slice))
+        site->selectedSlices().insert(slice->id());
   }
 
   // TODO we should not access timeline directly here
@@ -832,8 +839,7 @@ void Editor::drawOneSpriteUnclippedRect(ui::Graphics* g,
     IntersectClip clip(g, dest);
     if (clip) {
       // Draw slices
-      if (m_docPref.show.slices() && dx == m_proj.applyX(mainTilePosition().x) &&
-          dy == m_proj.applyY(mainTilePosition().y))
+      if (dx == m_proj.applyX(mainTilePosition().x) && dy == m_proj.applyY(mainTilePosition().y))
         drawSlices(g);
 
       // Draw the pixel grid
@@ -1243,6 +1249,8 @@ void Editor::drawSlices(ui::Graphics* g)
   gfx::Point mainOffset(mainTilePosition());
 
   for (auto slice : m_sprite->slices()) {
+    if (!isSliceVisible(slice))
+      continue;
     auto key = slice->getByFrame(m_frame);
     if (!key)
       continue;
@@ -1252,13 +1260,18 @@ void Editor::drawSlices(ui::Graphics* g)
                                  doc::rgba_getg(docColor),
                                  doc::rgba_getb(docColor),
                                  doc::rgba_geta(docColor));
+    if (slice->isCollisionBox()) {
+      auto& pref = Preferences::instance().collision;
+      color = color_utils::color_for_ui(slice->kind() == SliceKind::Hitbox ? pref.hitboxColor() :
+                                                                             pref.hurtboxColor());
+    }
     gfx::Rect out = key->bounds();
     out.offset(mainOffset);
     out = editorToScreen(out);
     out.offset(-bounds().origin());
 
     // Center slices
-    if (key->hasCenter()) {
+    if (!slice->isCollisionBox() && key->hasCenter()) {
       gfx::Rect in = editorToScreen(gfx::Rect(key->center()).offset(key->bounds().origin()))
                        .offset(-bounds().origin());
 
@@ -1277,7 +1290,7 @@ void Editor::drawSlices(ui::Graphics* g)
     }
 
     // Pivot
-    if (key->hasPivot()) {
+    if (!slice->isCollisionBox() && key->hasPivot()) {
       gfx::Rect in = editorToScreen(
                        gfx::Rect(key->pivot(), gfx::Size(1, 1)).offset(key->bounds().origin()))
                        .offset(-bounds().origin());
@@ -1289,9 +1302,11 @@ void Editor::drawSlices(ui::Graphics* g)
       g->drawRect(in_color, in);
     }
 
-    if (isSliceSelected(slice) && getCurrentEditorInk()->isSlice()) {
+    if (isSliceSelected(slice) && canSelectSlice(slice)) {
       PaintWidgetPartInfo info;
       theme->paintWidgetPart(g, theme->styles.colorbarSelection(), out, info);
+      if (slice->isCollisionBox())
+        g->drawRect(color, gfx::Rect(out).enlarge(guiscale()));
     }
     else {
       g->drawRect(color, out);
@@ -2006,10 +2021,46 @@ bool Editor::startStraightLineWithFreehandTool(const tools::Pointer* pointer)
           document()->lastDrawingPoint() != Doc::NoLastDrawingPoint());
 }
 
+bool Editor::isSliceVisible(const doc::Slice* slice) const
+{
+  if (!slice || !slice->getByFrame(m_frame))
+    return false;
+  switch (slice->kind()) {
+    case SliceKind::Hitbox:  return m_docPref.show.hitboxes();
+    case SliceKind::Hurtbox: return m_docPref.show.hurtboxes();
+    default:                 return m_docPref.show.slices();
+  }
+}
+
+bool Editor::canSelectSlice(const doc::Slice* slice) const
+{
+  auto* ink = getCurrentEditorInk();
+  if (!slice)
+    return false;
+  // Preserve regular slice selection across tools and animation keys.
+  if (!slice->isCollisionBox())
+    return !ink || !ink->isCollisionBox();
+  return ink && ink->isCollisionBox() && isSliceVisible(slice);
+}
+
+bool Editor::slicesTransforms() const
+{
+  auto* ink = getCurrentEditorInk();
+  return m_slicesTransforms && ink && !ink->isCollisionBox();
+}
+
 bool Editor::isSliceSelected(const doc::Slice* slice) const
 {
   ASSERT(slice);
   return m_selectedSlices.contains(slice->id());
+}
+
+bool Editor::hasSelectedSlices() const
+{
+  return std::any_of(
+    m_sprite->slices().begin(),
+    m_sprite->slices().end(),
+    [this](const Slice* slice) { return isSliceSelected(slice) && canSelectSlice(slice); });
 }
 
 void Editor::clearSlicesSelection()
@@ -2029,6 +2080,8 @@ void Editor::clearSlicesSelection()
 void Editor::selectSlice(const doc::Slice* slice)
 {
   ASSERT(slice);
+  if (!canSelectSlice(slice))
+    return;
   if (isActive())
     UIContext::instance()->notifyBeforeActiveSiteChanged();
 
@@ -2047,7 +2100,7 @@ bool Editor::selectSliceBox(const gfx::Rect& box)
   m_selectedSlices.clear();
   for (auto slice : m_sprite->slices()) {
     auto key = slice->getByFrame(m_frame);
-    if (key && key->bounds().intersects(box))
+    if (canSelectSlice(slice) && key && key->bounds().intersects(box))
       m_selectedSlices.insert(slice->id());
   }
   invalidate();
@@ -2064,7 +2117,8 @@ void Editor::selectAllSlices()
     UIContext::instance()->notifyBeforeActiveSiteChanged();
 
   for (auto slice : m_sprite->slices())
-    m_selectedSlices.insert(slice->id());
+    if (canSelectSlice(slice))
+      m_selectedSlices.insert(slice->id());
   invalidate();
 
   if (isActive())
@@ -2515,6 +2569,11 @@ void Editor::onInvalidateRegion(const gfx::Region& region)
 // When the current tool is changed
 void Editor::onActiveToolChange(tools::Tool* tool)
 {
+  if ((tool && tool->getInk(0)->isCollisionBox()) ||
+      std::any_of(m_sprite->slices().begin(), m_sprite->slices().end(), [this](const Slice* slice) {
+        return slice->isCollisionBox() && isSliceSelected(slice);
+      }))
+    clearSlicesSelection();
   m_state->onActiveToolChange(this, tool);
   if (hasMouse()) {
     updateStatusBar();
@@ -2575,6 +2634,14 @@ void Editor::onTiledModeChange()
 
 void Editor::onShowExtrasChange()
 {
+  for (auto* slice : m_sprite->slices()) {
+    if (slice->isCollisionBox() && !isSliceVisible(slice) &&
+        m_selectedSlices.contains(slice->id())) {
+      m_selectedSlices.erase(slice->id());
+    }
+  }
+  if (isActive())
+    UIContext::instance()->notifyActiveSiteChanged();
   invalidate();
 }
 
@@ -2728,10 +2795,12 @@ EditorHit Editor::calcHit(const gfx::Point& mouseScreenPos)
   if (ink) {
     // Check if we can transform slices
     if (ink->isSlice()) {
-      if (m_docPref.show.slices()) {
+      {
         gfx::Point mainOffset(mainTilePosition());
 
         for (auto slice : m_sprite->slices()) {
+          if (!canSelectSlice(slice) || !isSliceVisible(slice))
+            continue;
           auto key = slice->getByFrame(m_frame);
           if (key) {
             gfx::Rect bounds = key->bounds();
@@ -2755,7 +2824,7 @@ EditorHit Editor::calcHit(const gfx::Point& mouseScreenPos)
             }
 
             // Move center
-            if (!center.isEmpty()) {
+            if (!slice->isCollisionBox() && !center.isEmpty()) {
               center = editorToScreen(center.offset(key->bounds().origin()));
 
               bool horz1 = gfx::Rect(bounds.x, center.y - 2 * guiscale(), bounds.w, 5 * guiscale())

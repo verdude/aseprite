@@ -471,6 +471,12 @@
             <label text="@.default_slice_color" for="default_slice_color" />
             <colorpicker id="default_slice_color" rgba="true" />
           </hbox>
+          <grid columns="2">
+            <label text="@collision.hitbox_color" />
+            <colorpicker id="hitbox_color" rgba="true" />
+            <label text="@collision.hurtbox_color" />
+            <colorpicker id="hurtbox_color" rgba="true" />
+          </grid>
           <check id="use_slice_keys"
                  text="@.use_slice_keys"
                  pref="slices.use_keys" />

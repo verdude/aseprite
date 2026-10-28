@@ -475,6 +475,8 @@ private:
   obs::scoped_connection m_ctxConn1, m_ctxConn2;
   obs::connection m_firstFrameConn;
   obs::connection m_onionskinConn;
+  obs::connection m_showBoxesConn;
+  obs::scoped_connection m_boxColorsConn;
 
   // Marching ants stuff to show the range in the clipboard.
   // TODO merge this with the marching ants of the sprite editor (ui::Editor)

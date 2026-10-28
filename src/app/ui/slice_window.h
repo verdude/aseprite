@@ -13,6 +13,7 @@
 #include "doc/anidir.h"
 #include "doc/frame.h"
 #include "doc/selected_objects.h"
+#include "doc/slice.h"
 #include "doc/user_data.h"
 
 #include "slice_properties.xml.h"
@@ -40,6 +41,7 @@ public:
     kPivotX = 0x0200,
     kPivotY = 0x0400,
     kUserData = 0x0800,
+    kBoxKind = 0x1000,
     kAll = 0xffff,
   };
 
@@ -49,6 +51,7 @@ public:
 
   bool show();
 
+  doc::SliceKind boxKindValue() const;
   std::string nameValue() const;
   gfx::Rect boundsValue() const;
   gfx::Rect centerValue() const;

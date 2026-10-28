@@ -9,6 +9,7 @@
   #include "config.h"
 #endif
 
+#include "app/cmd/set_box_kind.h"
 #include "app/cmd/set_slice_key.h"
 #include "app/cmd/set_slice_name.h"
 #include "app/cmd/set_user_data.h"
@@ -89,7 +90,7 @@ void SlicePropertiesCommand::onExecute(Context* context)
     // If there is one selected slice with multiple keys, we will
     // modify the key in from the current frame.
     for (Slice* slice : slices.iterateAs<Slice>()) {
-      if (slice->size() > 1) {
+      if (slice->isCollisionBox() || slice->size() > 1) {
         frame = reader.frame();
         break;
       }
@@ -106,6 +107,10 @@ void SlicePropertiesCommand::onExecute(Context* context)
     Tx tx(writer, "Slice Properties");
 
     for (Slice* slice : slices.iterateAs<Slice>()) {
+      if (slice->isCollisionBox() && (mods & SliceWindow::kBoxKind) &&
+          slice->kind() != window.boxKindValue())
+        tx(new cmd::SetBoxKind(slice, window.boxKindValue()));
+
       // Change name
       if (mods & SliceWindow::kName) {
         std::string name = window.nameValue();

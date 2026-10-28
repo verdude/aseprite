@@ -168,8 +168,8 @@ public:
     , m_colorTarget(m_tilesMode ? ColorTarget(ColorTarget::BackgroundLayer, IMAGE_TILEMAP, 0) :
                     m_layer     ? ColorTarget(m_layer) :
                                   ColorTarget(ColorTarget::BackgroundLayer,
-                                          m_sprite->pixelFormat(),
-                                          m_sprite->transparentColor()))
+                                              m_sprite->pixelFormat(),
+                                              m_sprite->transparentColor()))
     , m_fgColor(color_utils::color_for_target_mask(params.fg, m_colorTarget))
     , m_bgColor(color_utils::color_for_target_mask(params.bg, m_colorTarget))
     , m_primaryColor(m_button == tools::ToolLoop::Left ? m_fgColor : m_bgColor)
@@ -479,7 +479,7 @@ public:
            m_context->activeDocument(),
            m_tool->getText().c_str(),
            ((m_ink->isSelection() || m_ink->isEyedropper() || m_ink->isScrollMovement() ||
-             m_ink->isSlice() || m_ink->isZoom()) ?
+             (m_ink->isSlice() && !m_ink->isCollisionBox()) || m_ink->isZoom()) ?
               DoesntModifyDocument :
               ModifyDocument))
     , m_floodfillSrcImage(nullptr)
@@ -562,9 +562,21 @@ public:
       // popup menu to create a new one.
       if (!m_editor->selectSliceBox(bounds) && (bounds.w > 1 || bounds.h > 1)) {
         Slice* slice = new Slice;
-        slice->setName(get_unique_slice_name(m_sprite));
+        if (m_ink->isCollisionBox()) {
+          const bool hurt = Preferences::instance().collision.createHurtbox();
+          slice->setKind(hurt ? SliceKind::Hurtbox : SliceKind::Hitbox);
+          if (hurt)
+            m_editor->docPref().show.hurtboxes(true);
+          else
+            m_editor->docPref().show.hitboxes(true);
+        }
+        slice->setName(get_unique_slice_name(
+          m_sprite,
+          slice->isCollisionBox() ? (slice->kind() == SliceKind::Hitbox ? "Hitbox" : "Hurtbox") :
+                                    "Slice"));
 
-        const frame_t keyFrame = (Preferences::instance().slices.useKeys() ? getFrame() : 0);
+        const frame_t keyFrame =
+          (slice->isCollisionBox() || Preferences::instance().slices.useKeys() ? getFrame() : 0);
 
         SliceKey key(bounds);
         slice->insert(keyFrame, key);
@@ -574,6 +586,8 @@ public:
           doc::rgba(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()));
 
         m_tx(new cmd::AddSlice(m_sprite, slice));
+        if (slice->isCollisionBox())
+          m_editor->selectSlice(slice);
         return;
       }
     }
@@ -786,8 +800,9 @@ public:
     constructor_prologue();
 
     // Start with an empty mask if the user is selecting with "default selection mode"
-    if (!m_document->isMaskVisible() ||
-        (int(getModifiers()) & int(tools::ToolLoopModifiers::kReplaceSelection)) != 0) {
+    if (!m_ink->isCollisionBox() &&
+        (!m_document->isMaskVisible() ||
+         (int(getModifiers()) & int(tools::ToolLoopModifiers::kReplaceSelection)) != 0)) {
       Mask emptyMask;
       m_tx(new cmd::SetMask(m_document, &emptyMask));
     }
@@ -914,8 +929,9 @@ tools::ToolLoop* create_tool_loop(Editor* editor,
   // Anyway this cannot be used in 'magic wand' tool (isSelection +
   // isFloodFill) because we need the original layer source
   // image/pixels to stop the flood-fill algorithm.
-  if (params.ink->isSelection() &&
-      !params.tool->getPointShape(button != tools::Pointer::Left ? 1 : 0)->isFloodFill()) {
+  if (params.ink->isCollisionBox() ||
+      (params.ink->isSelection() &&
+       !params.tool->getPointShape(button != tools::Pointer::Left ? 1 : 0)->isFloodFill())) {
     // Don't call site.layer(nullptr) because we want to keep the
     // site.layer() to know if we are in a tilemap layer
   }
@@ -982,8 +998,9 @@ tools::ToolLoop* create_tool_loop(Editor* editor,
     fill_toolloop_params_from_tool_preferences(params);
 
     ASSERT(context->activeDocument() == editor->document());
-    if (Preferences::instance().experimental.useSelectionToolLoop() &&
-        (params.ink->isSelection() || params.ink->isSlice())) {
+    if (params.ink->isCollisionBox() ||
+        (Preferences::instance().experimental.useSelectionToolLoop() &&
+         (params.ink->isSelection() || params.ink->isSlice()))) {
       auto* toolLoop =
         new SelectionToolLoopImpl(editor, site, grid, context, params, saveLastPoint);
       if (selectTiles)

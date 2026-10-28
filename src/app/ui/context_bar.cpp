@@ -1743,11 +1743,21 @@ private:
 class ContextBar::SliceFields : public HBox {
   class Item : public ListItem {
   public:
-    Item(const doc::Slice* slice) : ListItem(slice->name()), m_slice(slice) {}
-    const doc::Slice* slice() const { return m_slice; }
+    Item(const doc::Slice* slice)
+      : ListItem(slice->name() +
+                 (slice->isCollisionBox() ?
+                    " [" +
+                      (slice->kind() == doc::SliceKind::Hitbox ? Strings::collision_hitbox() :
+                                                                 Strings::collision_hurtbox()) +
+                      "]" :
+                    ""))
+      , m_sliceId(slice->id())
+    {
+    }
+    const doc::Slice* slice() const { return doc::get<doc::Slice>(m_sliceId); }
 
   private:
-    const doc::Slice* m_slice;
+    doc::ObjectId m_sliceId;
   };
 
   class Combo : public ComboBox {
@@ -1781,14 +1791,20 @@ class ContextBar::SliceFields : public HBox {
 
       const Slice* slice = nullptr;
       if (auto item = dynamic_cast<Item*>(getSelectedItem())) {
-        if (item->slice()->name() == getValue()) {
+        if (item->slice() && (item->text() == getValue() || item->slice()->name() == getValue())) {
           slice = item->slice();
         }
       }
 
       auto editor = Editor::activeEditor();
-      if (!slice && editor)
-        slice = editor->sprite()->slices().getByName(getValue());
+      if (!slice && editor) {
+        for (auto* candidate : editor->sprite()->slices()) {
+          if (candidate->name() == getValue() && editor->canSelectSlice(candidate)) {
+            slice = candidate;
+            break;
+          }
+        }
+      }
       if (slice)
         m_sliceFields->scrollToSlice(slice);
 
@@ -1803,8 +1819,18 @@ public:
     , m_combobox(this)
     , m_transform(Strings::context_bar_slice_transform())
     , m_action(2)
+    , m_changeFromEntry(false)
   {
     auto* theme = SkinTheme::get(this);
+
+    m_kind.addItem(Strings::collision_hitbox());
+    m_kind.addItem(Strings::collision_hurtbox());
+    m_kind.setSelectedItemIndex(Preferences::instance().collision.createHurtbox() ? 1 : 0);
+    m_kind.Change.connect([this] {
+      Preferences::instance().collision.createHurtbox(m_kind.getSelectedItemIndex() == 1);
+    });
+    addChild(&m_kind);
+    m_kind.setVisible(false);
 
     m_sel.addItem(Strings::context_bar_all());
     m_sel.addItem(Strings::context_bar_none());
@@ -1836,11 +1862,34 @@ public:
 
   void setupTooltips(TooltipManager* tooltipManager)
   {
-    tooltipManager->addTooltipFor(m_sel.at(0), Strings::context_bar_select_slices(), BOTTOM);
-    tooltipManager->addTooltipFor(m_sel.at(1), Strings::context_bar_deselect_slices(), BOTTOM);
+    m_tooltipManager = tooltipManager;
+    const bool collision = m_collisionMode;
+    tooltipManager->addTooltipFor(
+      m_sel.at(0),
+      collision ? Strings::collision_select_all() : Strings::context_bar_select_slices(),
+      BOTTOM);
+    tooltipManager->addTooltipFor(
+      m_sel.at(1),
+      collision ? Strings::collision_select_none() : Strings::context_bar_deselect_slices(),
+      BOTTOM);
     tooltipManager->addTooltipFor(&m_transform, Strings::context_bar_slice_transform_tip(), BOTTOM);
-    tooltipManager->addTooltipFor(m_action.at(0), Strings::context_bar_slice_props(), BOTTOM);
-    tooltipManager->addTooltipFor(m_action.at(1), Strings::context_bar_delete_slice(), BOTTOM);
+    tooltipManager->addTooltipFor(
+      m_action.at(0),
+      collision ? Strings::collision_properties() : Strings::context_bar_slice_props(),
+      BOTTOM);
+    tooltipManager->addTooltipFor(
+      m_action.at(1),
+      collision ? Strings::collision_delete() : Strings::context_bar_delete_slice(),
+      BOTTOM);
+  }
+
+  void setCollisionMode(bool value)
+  {
+    m_collisionMode = value;
+    m_kind.setVisible(value);
+    if (m_tooltipManager)
+      setupTooltips(m_tooltipManager);
+    updateLayout();
   }
 
   void setDoc(Doc* doc) { m_doc = doc; }
@@ -1900,6 +1949,9 @@ private:
     m_combobox.deleteAllItems();
     if (m_doc && m_doc->sprite()) {
       for (auto* slice : sort_slices_by_name(m_doc->sprite()->slices(), MatchWords(m_filter))) {
+        auto* editor = Editor::activeEditor();
+        if (!editor || !editor->canSelectSlice(slice))
+          continue;
         Item* item = new Item(slice);
         m_combobox.addItem(item);
       }
@@ -1909,7 +1961,7 @@ private:
   void scrollToSlice(const Slice* slice)
   {
     auto editor = Editor::activeEditor();
-    if (editor && slice) {
+    if (editor && slice && editor->canSelectSlice(slice)) {
       if (const SliceKey* key = slice->getByFrame(editor->frame())) {
         editor->centerInSpritePoint(key->bounds().center());
       }
@@ -1918,11 +1970,19 @@ private:
 
   void updateLayout()
   {
-    const bool visible = (m_doc && m_doc->sprite() && !m_doc->sprite()->slices().empty());
+    bool visible = false;
+    if (auto* editor = Editor::activeEditor()) {
+      if (m_doc && m_doc->sprite())
+        for (auto* slice : m_doc->sprite()->slices())
+          if (editor->canSelectSlice(slice)) {
+            visible = true;
+            break;
+          }
+    }
     const bool relayout = (visible != m_combobox.isVisible() || visible != m_action.isVisible());
 
     m_combobox.setVisible(visible);
-    m_transform.setVisible(visible);
+    m_transform.setVisible(visible && !m_collisionMode);
     m_action.setVisible(visible);
 
     if (auto* editor = Editor::activeEditor())
@@ -1930,7 +1990,7 @@ private:
 
     updateState();
 
-    if (relayout)
+    if (relayout && parent())
       parent()->layout();
   }
 
@@ -1967,8 +2027,10 @@ private:
     if (auto item = dynamic_cast<Item*>(m_combobox.getSelectedItem())) {
       if (auto editor = Editor::activeEditor()) {
         const doc::Slice* slice = item->slice();
-        editor->clearSlicesSelection();
-        editor->selectSlice(slice);
+        if (slice && editor->canSelectSlice(slice)) {
+          editor->clearSlicesSelection();
+          editor->selectSlice(slice);
+        }
       }
     }
     updateState();
@@ -2004,6 +2066,9 @@ private:
   }
 
   Doc* m_doc;
+  TooltipManager* m_tooltipManager = nullptr;
+  bool m_collisionMode = false;
+  ComboBox m_kind;
   ButtonSet m_sel;
   Combo m_combobox;
   CheckBox m_transform;
@@ -2175,6 +2240,12 @@ void ContextBar::onDocChange(Doc* doc)
 {
   DocObserverWidget<ui::HBox>::onDocChange(doc);
   m_sliceFields->setDoc(doc);
+}
+
+void ContextBar::onGeneralUpdate(DocEvent& ev)
+{
+  if (m_sliceFields->isVisible())
+    updateSliceFields(UIContext::instance()->activeSite());
 }
 
 void ContextBar::onAddSlice(DocEvent& ev)
@@ -2448,6 +2519,7 @@ void ContextBar::updateForTool(tools::Tool* tool)
                          (isPaint || isEffect || hasSelectOptions));
   m_symmetry->updateWithCurrentDocument();
 
+  m_sliceFields->setCollisionMode(tool && tool->getInk(0)->isCollisionBox());
   m_sliceFields->setVisible(isSlice);
   if (isSlice)
     updateSliceFields(UIContext::instance()->activeSite());

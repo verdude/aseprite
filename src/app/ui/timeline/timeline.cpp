@@ -84,6 +84,8 @@ enum {
   PART_HEADER_CONTINUOUS,
   PART_HEADER_GEAR,
   PART_HEADER_ONIONSKIN,
+  PART_HEADER_HITBOXES,
+  PART_HEADER_HURTBOXES,
   PART_HEADER_ONIONSKIN_RANGE_LEFT,
   PART_HEADER_ONIONSKIN_RANGE_RIGHT,
   PART_HEADER_LAYER,
@@ -259,6 +261,7 @@ Timeline::Timeline(TooltipManager* tooltipManager)
   , m_aniControls(tooltipManager)
 {
   enableFlags(CTRL_RIGHT_CLICK | ALLOW_DROP);
+  m_boxColorsConn = Preferences::instance().collision.AfterChange.connect([this] { invalidate(); });
 
   m_ctxConn1 = m_context->BeforeCommandExecution.connect(&Timeline::onBeforeCommandExecution, this);
   m_ctxConn2 = m_context->AfterCommandExecution.connect(&Timeline::onAfterCommandExecution, this);
@@ -379,6 +382,7 @@ void Timeline::updateUsingEditor(Editor* editor)
     });
 
   m_onionskinConn = docPref.onionskin.AfterChange.connect([this] { invalidate(); });
+  m_showBoxesConn = docPref.show.AfterChange.connect([this] { invalidate(); });
 
   setFocusStop(true);
   regenerateCols();
@@ -399,6 +403,7 @@ void Timeline::detachDocument()
 
   m_firstFrameConn.disconnect();
   m_onionskinConn.disconnect();
+  m_showBoxesConn.disconnect();
 
   if (m_document) {
     m_thumbnailsPrefConn.disconnect();
@@ -744,6 +749,13 @@ bool Timeline::onProcessMessage(Message* msg)
           break;
         }
 
+        case PART_HEADER_HITBOXES:
+        case PART_HEADER_HURTBOXES: {
+          m_context->executeCommand(Commands::instance()->byId(m_clk.part == PART_HEADER_HITBOXES ?
+                                                                 CommandId::ShowHitboxes() :
+                                                                 CommandId::ShowHurtboxes()));
+          break;
+        }
         case PART_HEADER_ONIONSKIN: {
           docPref().onionskin.active(!docPref().onionskin.active());
           invalidate();
@@ -2255,6 +2267,20 @@ void Timeline::drawHeader(ui::Graphics* g)
            m_hot.part == PART_HEADER_ONIONSKIN,
            m_clk.part == PART_HEADER_ONIONSKIN);
 
+  for (const auto part : { PART_HEADER_HITBOXES, PART_HEADER_HURTBOXES }) {
+    const bool hitboxes = part == PART_HEADER_HITBOXES;
+    const bool visible = hitboxes ? docPref().show.hitboxes() : docPref().show.hurtboxes();
+    const Rect rc = getPartBounds(Hit(part));
+    drawPart(g, rc, nullptr, styles.timelineBox(), visible, m_hot.part == part, m_clk.part == part);
+    const auto& pref = Preferences::instance().collision;
+    const auto color = color_utils::color_for_ui(hitboxes ? pref.hitboxColor() :
+                                                            pref.hurtboxColor());
+    const Rect icon = gfx::Rect(rc).shrink(4 * guiscale());
+    g->drawRect(color, icon);
+    if (!visible)
+      g->drawLine(color, gfx::Point(icon.x, icon.y2() - 1), gfx::Point(icon.x2() - 1, icon.y));
+  }
+
   // Empty header space.
   drawPart(g,
            getPartBounds(Hit(PART_HEADER_LAYER)),
@@ -3124,10 +3150,17 @@ gfx::Rect Timeline::getPartBounds(const Hit& hit) const
                        headerBoxWidth(),
                        headerBoxHeight());
 
-    case PART_HEADER_LAYER:
-      return gfx::Rect(bounds.x + headerBoxWidth() * 5,
+    case PART_HEADER_HITBOXES:
+    case PART_HEADER_HURTBOXES:
+      return gfx::Rect(bounds.x + headerBoxWidth() * (hit.part == PART_HEADER_HITBOXES ? 5 : 6),
                        bounds.y + y,
-                       separatorX() - headerBoxWidth() * 5,
+                       headerBoxWidth(),
+                       headerBoxHeight());
+
+    case PART_HEADER_LAYER:
+      return gfx::Rect(bounds.x + headerBoxWidth() * 7,
+                       bounds.y + y,
+                       std::max(0, separatorX() - headerBoxWidth() * 7),
                        headerBoxHeight());
 
     case PART_HEADER_FRAME: {
@@ -3693,6 +3726,10 @@ Timeline::Hit Timeline::hitTest(ui::Message* msg, const gfx::Point& mousePos)
           hit.part = PART_HEADER_GEAR;
         else if (getPartBounds(Hit(PART_HEADER_ONIONSKIN)).contains(mousePos))
           hit.part = PART_HEADER_ONIONSKIN;
+        else if (getPartBounds(Hit(PART_HEADER_HITBOXES)).contains(mousePos))
+          hit.part = PART_HEADER_HITBOXES;
+        else if (getPartBounds(Hit(PART_HEADER_HURTBOXES)).contains(mousePos))
+          hit.part = PART_HEADER_HURTBOXES;
         else if (getPartBounds(Hit(PART_HEADER_LAYER)).contains(mousePos))
           hit.part = PART_HEADER_LAYER;
       }
@@ -3859,6 +3896,12 @@ void Timeline::updateStatusBar(ui::Message* msg)
     Layer* layer = (validLayer(m_hot.layer) ? m_rows[m_hot.layer].layer() : nullptr);
 
     switch (m_hot.part) {
+      case PART_HEADER_HITBOXES:
+      case PART_HEADER_HURTBOXES:
+        sb->setStatusText(0,
+                          m_hot.part == PART_HEADER_HITBOXES ? Strings::collision_show_hitboxes() :
+                                                               Strings::collision_show_hurtboxes());
+        return;
       case PART_HEADER_ONIONSKIN: {
         sb->setStatusText(
           0,
@@ -4885,9 +4928,10 @@ void Timeline::setLayerCollapsedFlag(const layer_t l, const bool state)
 
 int Timeline::separatorX() const
 {
-  return std::clamp(m_separator_x * guiscale(),
-                    headerBoxWidth(),
-                    std::max(bounds().w - guiscale(), headerBoxWidth()));
+  return std::clamp(
+    m_separator_x * guiscale(),
+    std::min(headerBoxWidth() * 7, std::max(headerBoxWidth(), bounds().w - guiscale())),
+    std::max(bounds().w - guiscale(), headerBoxWidth()));
 }
 
 void Timeline::setSeparatorX(int newValue)

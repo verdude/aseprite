@@ -66,6 +66,7 @@ public:
 
   // Returns true if this ink is used to mark slices
   virtual bool isSlice() const { return false; }
+  virtual bool isCollisionBox() const { return false; }
 
   // Returns true if this ink acts like the text tool
   virtual bool isText() const { return false; }

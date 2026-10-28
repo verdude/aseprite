@@ -84,7 +84,7 @@ void fill_area_combobox(const doc::Sprite* sprite, ui::ComboBox* area, const std
     area->setSelectedItemIndex(i);
 
   for (auto* slice : sort_slices_by_name(sprite->slices(), MatchWords())) {
-    if (slice->name().empty())
+    if (slice->isCollisionBox() || slice->name().empty())
       continue;
 
     i = area->addItem(new SliceListItem(slice));

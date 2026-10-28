@@ -10,6 +10,13 @@
       <entry id="name" maxsize="256" magnet="true" cell_align="horizontal" expansive="true" />
       <button id="user_data" icon="icon_user_data" maxsize="32" tooltip="@.user_data_tooltip" />
     </grid>
+    <hbox id="box_kind_fields">
+      <label text="@collision.kind" />
+      <combobox id="box_kind">
+        <listitem text="@collision.hitbox" />
+        <listitem text="@collision.hurtbox" />
+      </combobox>
+    </hbox>
     <grid columns="3" expansive="true">
       <separator horizontal="true" cell_hspan="3" />
 

@@ -1024,6 +1024,8 @@
           <item command="ShowGrid" text="@.view_show_grid" />
           <item command="ShowAutoGuides" text="@.view_show_auto_guides" />
           <item command="ShowSlices" text="@.view_show_slices" />
+          <item command="ShowHitboxes" text="@collision.show_hitboxes" />
+          <item command="ShowHurtboxes" text="@collision.show_hurtboxes" />
           <item command="ShowPixelGrid" text="@.view_show_pixel_grid" />
           <item command="ShowTileNumbers" text="@.view_show_tile_numbers" />
           <separator />
@@ -1213,6 +1215,12 @@
     <menu id="tag_popup_menu">
       <item command="FrameTagProperties" text="@main_menu.frame_tags_tag_properties" group="tag_popup_properties" />
       <item command="RemoveFrameTag" text="@main_menu.frame_tags_delete_tag" group="tag_popup_delete" />
+    </menu>
+
+    <menu id="collision_popup_menu">
+      <item command="SliceProperties" text="@collision.properties" />
+      <item command="DuplicateSlice" text="@collision.duplicate" />
+      <item command="RemoveSlice" text="@collision.delete" />
     </menu>
 
     <menu id="slice_popup_menu">
@@ -1415,6 +1423,12 @@
             controller="two_points"
             pointshape="pixel"
             intertwine="as_rectangles"
+            tracepolicy="last" />
+    </group>
+
+    <group id="collision_tools">
+      <tool id="collision" text="@collision.tool" fill="none" ink="collision"
+            controller="two_points" pointshape="pixel" intertwine="as_rectangles"
             tracepolicy="last" />
     </group>
 
