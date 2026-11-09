@@ -600,8 +600,7 @@ int Sprite_newCollisionBox(lua_State* L, const doc::SliceKind kind)
     return luaL_error(L, "collision box bounds must have positive width and height");
   auto* box = new doc::Slice;
   box->setKind(kind);
-  box->setName(
-    get_unique_slice_name(sprite, kind == doc::SliceKind::Hitbox ? "Hitbox" : "Hurtbox"));
+  box->setName(get_unique_slice_name(sprite, get_collision_box_type_name(kind)));
   box->insert(frame, doc::SliceKey(bounds));
   Tx tx(sprite);
   tx(new cmd::AddSlice(sprite, box));
@@ -617,6 +616,10 @@ int Sprite_newHitbox(lua_State* L)
 int Sprite_newHurtbox(lua_State* L)
 {
   return Sprite_newCollisionBox(L, doc::SliceKind::Hurtbox);
+}
+int Sprite_newPushbox(lua_State* L)
+{
+  return Sprite_newCollisionBox(L, doc::SliceKind::Pushbox);
 }
 
 int Sprite_deleteSlice(lua_State* L)
@@ -1143,6 +1146,7 @@ const luaL_Reg Sprite_methods[] = {
   // Slices
   { "newHitbox",         Sprite_newHitbox         },
   { "newHurtbox",        Sprite_newHurtbox        },
+  { "newPushbox",        Sprite_newPushbox        },
   { "newSlice",          Sprite_newSlice          },
   { "deleteSlice",       Sprite_deleteSlice       },
   // Tilesets & Tiles

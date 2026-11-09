@@ -18,6 +18,7 @@
 #include "app/script/luacpp.h"
 #include "app/script/userdata.h"
 #include "app/tx.h"
+#include "app/util/slice_utils.h"
 #include "doc/slice.h"
 #include "doc/sprite.h"
 
@@ -45,20 +46,17 @@ int Slice_get_sprite(lua_State* L)
 int Slice_get_kind(lua_State* L)
 {
   auto* slice = get_docobj<Slice>(L, 1);
-  lua_pushstring(L,
-                 slice->kind() == SliceKind::Hitbox  ? "hitbox" :
-                 slice->kind() == SliceKind::Hurtbox ? "hurtbox" :
-                                                       "slice");
+  lua_pushstring(L, slice_kind_id(slice->kind()));
   return 1;
 }
 int Slice_set_kind(lua_State* L)
 {
   auto* slice = get_docobj<Slice>(L, 1);
-  const std::string kind = luaL_checkstring(L, 2);
-  if (!slice->isCollisionBox() || (kind != "hitbox" && kind != "hurtbox"))
-    return luaL_error(L, "only hitbox/hurtbox type changes are supported");
+  const auto kind = slice_kind_from_id(luaL_checkstring(L, 2));
+  if (!slice->isCollisionBox() || kind == SliceKind::Slice)
+    return luaL_error(L, "only hitbox/hurtbox/pushbox type changes are supported");
   Tx tx(slice->sprite());
-  tx(new cmd::SetBoxKind(slice, kind == "hitbox" ? SliceKind::Hitbox : SliceKind::Hurtbox));
+  tx(new cmd::SetBoxKind(slice, kind));
   tx.commit();
   return 0;
 }
@@ -76,10 +74,7 @@ int Slice_get_color(lua_State* L)
   auto* slice = get_docobj<Slice>(L, 1);
   if (!slice->isCollisionBox())
     return UserData_get_color<Slice>(L);
-  auto& pref = Preferences::instance().collision;
-  push_obj<app::Color>(
-    L,
-    slice->kind() == SliceKind::Hitbox ? pref.hitboxColor() : pref.hurtboxColor());
+  push_obj<app::Color>(L, get_collision_box_color(slice->kind()));
   return 1;
 }
 int Slice_set_color(lua_State* L)

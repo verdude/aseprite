@@ -116,6 +116,10 @@ int Frame_get_hurtboxes(lua_State* L)
 {
   return Frame_get_boxes(L, doc::SliceKind::Hurtbox);
 }
+int Frame_get_pushboxes(lua_State* L)
+{
+  return Frame_get_boxes(L, doc::SliceKind::Pushbox);
+}
 
 int Frame_set_duration(lua_State* L)
 {
@@ -137,6 +141,7 @@ const luaL_Reg Frame_methods[] = {
 const Property Frame_properties[] = {
   { "hitboxes",    Frame_get_hitboxes,    nullptr            },
   { "hurtboxes",   Frame_get_hurtboxes,   nullptr            },
+  { "pushboxes",   Frame_get_pushboxes,   nullptr            },
   { "sprite",      Frame_get_sprite,      nullptr            },
   { "frameNumber", Frame_get_frameNumber, nullptr            },
   { "duration",    Frame_get_duration,    Frame_set_duration },
