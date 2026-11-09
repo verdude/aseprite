@@ -1510,8 +1510,8 @@ void DocExporter::createDataFile(const Samples& samples, std::ostream& os, doc::
     if (sample.isAnimationFrame()) {
       // Frame-local collision data is independent of overlay visibility and
       // of the optional regular slice metadata. Bounds stay in canvas space.
-      for (const auto kind : { SliceKind::Hurtbox, SliceKind::Hitbox }) {
-        os << ",\n    \"" << (kind == SliceKind::Hitbox ? "hitboxes" : "hurtboxes") << "\": [";
+      for (const auto kind : { SliceKind::Hurtbox, SliceKind::Hitbox, SliceKind::Pushbox }) {
+        os << ",\n    \"" << slice_kind_id(kind) << "es\": [";
         bool first = true;
         for (const auto* box : sample.sprite()->slices()) {
           if (box->kind() != kind)

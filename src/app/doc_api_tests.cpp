@@ -149,11 +149,16 @@ TEST_F(BasicDocApiTest, MoveCel)
   EXPECT_EQ(128, cel2->opacity());
 }
 
-TEST_F(BasicDocApiTest, CollisionBoxFrameOperationsRollback)
+class CollisionBoxDocApiTest : public BasicDocApiTest,
+                               public ::testing::WithParamInterface<SliceKind> {};
+
+INSTANTIATE_TEST_SUITE_P(AllKinds, CollisionBoxDocApiTest, ::testing::ValuesIn(CollisionBoxKinds));
+
+TEST_P(CollisionBoxDocApiTest, FrameOperationsRollback)
 {
   sprite->setTotalFrames(4);
   auto* box = new Slice;
-  box->setKind(SliceKind::Hitbox);
+  box->setKind(GetParam());
   box->insert(2, SliceKey(gfx::Rect(1, 2, 3, 4)));
   sprite->slices().add(box);
   const auto id = box->id();
@@ -200,14 +205,14 @@ TEST_F(BasicDocApiTest, CollisionBoxFrameOperationsRollback)
   EXPECT_NE(nullptr, sprite->slices().getById(id));
 }
 
-TEST_F(BasicDocApiTest, CropCollisionBoxes)
+TEST_P(CollisionBoxDocApiTest, Crop)
 {
   auto* partial = new Slice;
-  partial->setKind(SliceKind::Hurtbox);
+  partial->setKind(GetParam());
   partial->insert(0, SliceKey(gfx::Rect(1, 1, 4, 4)));
   sprite->slices().add(partial);
   auto* outside = new Slice;
-  outside->setKind(SliceKind::Hitbox);
+  outside->setKind(GetParam());
   outside->insert(0, SliceKey(gfx::Rect(10, 10, 4, 4)));
   sprite->slices().add(outside);
   const auto outsideId = outside->id();

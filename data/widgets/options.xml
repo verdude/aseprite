@@ -476,6 +476,8 @@
             <colorpicker id="hitbox_color" rgba="true" />
             <label text="@collision.hurtbox_color" />
             <colorpicker id="hurtbox_color" rgba="true" />
+            <label text="@collision.pushbox_color" />
+            <colorpicker id="pushbox_color" rgba="true" />
           </grid>
           <check id="use_slice_keys"
                  text="@.use_slice_keys"

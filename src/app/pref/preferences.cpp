@@ -110,6 +110,12 @@ Preferences::~Preferences()
 void Preferences::load()
 {
   app::gen::GlobalPref::load();
+  // Keep the previous two-type creation choice when upgrading.
+  if (!isSet(collision.createKind) && get_config_bool("collision", "create_hurtbox", false))
+    collision.createKind(doc::SliceKind::Hurtbox);
+  if (collision.createKind() < doc::SliceKind::Hitbox ||
+      collision.createKind() > doc::SliceKind::Pushbox)
+    collision.createKind(doc::SliceKind::Hitbox);
 }
 
 void Preferences::save()

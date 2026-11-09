@@ -50,6 +50,25 @@ Slice::~Slice()
   ASSERT(!m_owner);
 }
 
+const char* slice_kind_id(SliceKind kind)
+{
+  switch (kind) {
+    case SliceKind::Hitbox:  return "hitbox";
+    case SliceKind::Hurtbox: return "hurtbox";
+    case SliceKind::Pushbox: return "pushbox";
+    default:                 return "slice";
+  }
+}
+
+SliceKind slice_kind_from_id(const std::string& id)
+{
+  for (const auto kind : CollisionBoxKinds) {
+    if (id == slice_kind_id(kind))
+      return kind;
+  }
+  return SliceKind::Slice;
+}
+
 SliceKind Slice::kind() const
 {
   const auto& maps = userData().propertiesMaps();
@@ -57,12 +76,8 @@ SliceKind Slice::kind() const
   if (group != maps.end()) {
     auto it = group->second.find("kind");
     if (it != group->second.end()) {
-      if (const auto* value = std::get_if<std::string>(&it->second)) {
-        if (*value == "hitbox")
-          return SliceKind::Hitbox;
-        if (*value == "hurtbox")
-          return SliceKind::Hurtbox;
-      }
+      if (const auto* value = std::get_if<std::string>(&it->second))
+        return slice_kind_from_id(*value);
     }
   }
   return SliceKind::Slice;
@@ -73,8 +88,7 @@ void Slice::setKind(SliceKind kind)
   if (kind == SliceKind::Slice)
     userData().propertiesMaps().erase(CollisionData);
   else
-    userData().properties(CollisionData)["kind"] = std::string(
-      kind == SliceKind::Hitbox ? "hitbox" : "hurtbox");
+    userData().properties(CollisionData)["kind"] = std::string(slice_kind_id(kind));
 }
 
 void Slice::setBoxFrame(frame_t frame)

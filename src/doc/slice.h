@@ -63,7 +63,14 @@ private:
   gfx::Point m_pivot;
 };
 
-enum class SliceKind { Slice, Hitbox, Hurtbox };
+enum class SliceKind { Slice, Hitbox, Hurtbox, Pushbox };
+
+inline constexpr SliceKind CollisionBoxKinds[] = { SliceKind::Hitbox,
+                                                   SliceKind::Hurtbox,
+                                                   SliceKind::Pushbox };
+
+const char* slice_kind_id(SliceKind kind);
+SliceKind slice_kind_from_id(const std::string& id);
 
 class Slice : public WithUserData {
 public:

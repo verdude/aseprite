@@ -147,22 +147,29 @@ int main(int argc, char** argv)
 
 TEST(Slice, CollisionBoxesAreFrameLocal)
 {
-  Slice box;
-  box.setKind(SliceKind::Hitbox);
-  box.insert(3, SliceKey(gfx::Rect(1, 2, 8, 9)));
-  EXPECT_EQ(nullptr, box.getByFrame(2));
-  ASSERT_NE(nullptr, box.getByFrame(3));
-  EXPECT_EQ(nullptr, box.getByFrame(4));
-  box.insert(4, SliceKey(gfx::Rect(2, 3, 4, 5)));
-  EXPECT_EQ(1, box.size());
-  box.remove(2);
-  EXPECT_EQ(1, box.size());
-  box.setBoxFrame(5);
-  EXPECT_EQ(nullptr, box.getByFrame(3));
-  EXPECT_EQ(gfx::Rect(1, 2, 8, 9), box.getByFrame(5)->bounds());
-  Slice copy(box);
-  EXPECT_EQ(SliceKind::Hitbox, copy.kind());
-  EXPECT_EQ(5, copy.boxFrame());
-  copy.setKind(SliceKind::Hurtbox);
-  EXPECT_EQ(SliceKind::Hitbox, box.kind());
+  for (const auto kind : CollisionBoxKinds) {
+    Slice box;
+    box.setKind(kind);
+    box.insert(3, SliceKey(gfx::Rect(1, 2, 8, 9)));
+    EXPECT_EQ(nullptr, box.getByFrame(2));
+    ASSERT_NE(nullptr, box.getByFrame(3));
+    EXPECT_EQ(nullptr, box.getByFrame(4));
+    box.insert(4, SliceKey(gfx::Rect(2, 3, 4, 5)));
+    EXPECT_EQ(1, box.size());
+    box.remove(2);
+    EXPECT_EQ(1, box.size());
+    box.setBoxFrame(5);
+    EXPECT_EQ(nullptr, box.getByFrame(3));
+    EXPECT_EQ(gfx::Rect(1, 2, 8, 9), box.getByFrame(5)->bounds());
+    Slice copy(box);
+    EXPECT_EQ(kind, copy.kind());
+    EXPECT_EQ(5, copy.boxFrame());
+    for (const auto other : CollisionBoxKinds) {
+      copy.setKind(other);
+      EXPECT_EQ(other, copy.kind());
+      EXPECT_EQ(kind, box.kind());
+      EXPECT_EQ(5, copy.boxFrame());
+      EXPECT_EQ(box.getByFrame(5)->bounds(), copy.getByFrame(5)->bounds());
+    }
+  }
 }

@@ -44,7 +44,7 @@ SliceWindow::SliceWindow(const doc::Sprite* sprite,
     centerX()->parent()->setVisible(false);
     pivot()->setVisible(false);
     pivotX()->parent()->setVisible(false);
-    boxKind()->setSelectedItemIndex(slice->kind() == doc::SliceKind::Hitbox ? 0 : 1);
+    boxKind()->setSelectedItemIndex(int(slice->kind()) - 1);
     for (auto* item : slices.iterateAs<Slice>()) {
       if (item->kind() != slice->kind()) {
         boxKind()->setSelectedItemIndex(-1);
@@ -127,7 +127,7 @@ bool SliceWindow::show()
 
 doc::SliceKind SliceWindow::boxKindValue() const
 {
-  return boxKind()->getSelectedItemIndex() == 1 ? doc::SliceKind::Hurtbox : doc::SliceKind::Hitbox;
+  return doc::CollisionBoxKinds[std::max(0, boxKind()->getSelectedItemIndex())];
 }
 
 std::string SliceWindow::nameValue() const

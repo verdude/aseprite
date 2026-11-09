@@ -563,17 +563,12 @@ public:
       if (!m_editor->selectSliceBox(bounds) && (bounds.w > 1 || bounds.h > 1)) {
         Slice* slice = new Slice;
         if (m_ink->isCollisionBox()) {
-          const bool hurt = Preferences::instance().collision.createHurtbox();
-          slice->setKind(hurt ? SliceKind::Hurtbox : SliceKind::Hitbox);
-          if (hurt)
-            m_editor->docPref().show.hurtboxes(true);
-          else
-            m_editor->docPref().show.hitboxes(true);
+          slice->setKind(Preferences::instance().collision.createKind());
+          get_collision_box_visibility(m_document, slice->kind())(true);
         }
         slice->setName(get_unique_slice_name(
           m_sprite,
-          slice->isCollisionBox() ? (slice->kind() == SliceKind::Hitbox ? "Hitbox" : "Hurtbox") :
-                                    "Slice"));
+          slice->isCollisionBox() ? get_collision_box_type_name(slice->kind()) : "Slice"));
 
         const frame_t keyFrame =
           (slice->isCollisionBox() || Preferences::instance().slices.useKeys() ? getFrame() : 0);

@@ -385,7 +385,8 @@
     <section id="collision">
       <option id="hitbox_color" type="app::Color" default="app::Color::fromRgb(255, 0, 0)" />
       <option id="hurtbox_color" type="app::Color" default="app::Color::fromRgb(0, 255, 0)" />
-      <option id="create_hurtbox" type="bool" default="false" />
+      <option id="pushbox_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255)" />
+      <option id="create_kind" type="doc::SliceKind" default="doc::SliceKind::Hitbox" />
     </section>
     <section id="slices">
       <option id="default_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255)" />
@@ -646,6 +647,7 @@
       <option id="slices" type="bool" default="true" />
       <option id="hitboxes" type="bool" default="true" />
       <option id="hurtboxes" type="bool" default="true" />
+      <option id="pushboxes" type="bool" default="true" />
       <option id="auto_guides" type="bool" default="true" />
       <option id="tile_numbers" type="bool" default="true" />
     </section>

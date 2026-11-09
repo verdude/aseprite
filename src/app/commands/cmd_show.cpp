@@ -13,6 +13,7 @@
 #include "app/context.h"
 #include "app/modules/gui.h"
 #include "app/pref/preferences.h"
+#include "app/util/slice_utils.h"
 
 namespace app {
 
@@ -182,37 +183,33 @@ protected:
 
 class ShowCollisionBoxesCommand : public Command {
 public:
-  explicit ShowCollisionBoxesCommand(bool hurtboxes)
-    : Command(hurtboxes ? CommandId::ShowHurtboxes() : CommandId::ShowHitboxes())
-    , m_hurtboxes(hurtboxes)
-  {
-  }
+  ShowCollisionBoxesCommand(const char* id, doc::SliceKind kind) : Command(id), m_kind(kind) {}
 
 protected:
   bool onChecked(Context* ctx) override
   {
-    auto& show = Preferences::instance().document(ctx->activeDocument()).show;
-    return m_hurtboxes ? show.hurtboxes() : show.hitboxes();
+    return get_collision_box_visibility(ctx->activeDocument(), m_kind)();
   }
   void onExecute(Context* ctx) override
   {
-    auto& show = Preferences::instance().document(ctx->activeDocument()).show;
-    if (m_hurtboxes)
-      show.hurtboxes(!show.hurtboxes());
-    else
-      show.hitboxes(!show.hitboxes());
+    auto& visible = get_collision_box_visibility(ctx->activeDocument(), m_kind);
+    visible(!visible());
   }
 
 private:
-  bool m_hurtboxes;
+  doc::SliceKind m_kind;
 };
 Command* CommandFactory::createShowHitboxesCommand()
 {
-  return new ShowCollisionBoxesCommand(false);
+  return new ShowCollisionBoxesCommand(CommandId::ShowHitboxes(), doc::SliceKind::Hitbox);
 }
 Command* CommandFactory::createShowHurtboxesCommand()
 {
-  return new ShowCollisionBoxesCommand(true);
+  return new ShowCollisionBoxesCommand(CommandId::ShowHurtboxes(), doc::SliceKind::Hurtbox);
+}
+Command* CommandFactory::createShowPushboxesCommand()
+{
+  return new ShowCollisionBoxesCommand(CommandId::ShowPushboxes(), doc::SliceKind::Pushbox);
 }
 
 class ShowSlicesCommand : public Command {

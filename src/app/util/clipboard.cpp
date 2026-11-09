@@ -835,10 +835,7 @@ void Clipboard::paste(Context* ctx, const bool interactive, const gfx::Point* po
         Slice* slice = new Slice(s);
         if (slice->isCollisionBox()) {
           slice->setBoxFrame(editor->frame());
-          if (slice->kind() == SliceKind::Hitbox)
-            editor->docPref().show.hitboxes(true);
-          else
-            editor->docPref().show.hurtboxes(true);
+          get_collision_box_visibility(editor->document(), slice->kind())(true);
         }
         slice->setName(Strings::general_copy_of(slice->name()));
         tx(new cmd::AddSlice(dstSpr, slice));

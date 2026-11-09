@@ -1043,7 +1043,7 @@ TEST_F(DocRangeOps, CollisionBoxesFollowWholeFrames)
   std::vector<Slice*> boxes;
   for (frame_t frame = 0; frame < 6; ++frame) {
     auto* box = new Slice;
-    box->setKind(frame % 2 ? SliceKind::Hurtbox : SliceKind::Hitbox);
+    box->setKind(CollisionBoxKinds[frame % 3]);
     box->insert(frame, SliceKey(gfx::Rect(frame, 0, 1, 1)));
     sprite->slices().add(box);
     boxes.push_back(box);

@@ -188,7 +188,7 @@ void update_xml_slice(const doc::Slice* slice, XMLElement* xmlSlice)
   else if (xmlSlice->Attribute("text"))
     xmlSlice->DeleteAttribute("text");
   if (slice->isCollisionBox())
-    xmlSlice->SetAttribute("kind", slice->kind() == SliceKind::Hitbox ? "hitbox" : "hurtbox");
+    xmlSlice->SetAttribute("kind", slice_kind_id(slice->kind()));
   xmlSlice->SetAttribute("color", color_to_hex(slice->userData().color()).c_str());
 
   // Update <key> elements
@@ -337,12 +337,8 @@ void load_aseprite_data_file(const std::string& dataFilename,
       auto slice = new doc::Slice();
       slice->setName(xmlSlice->Attribute("name") ? xmlSlice->Attribute("name") : sliceId);
 
-      if (const char* kind = xmlSlice->Attribute("kind")) {
-        if (std::strcmp(kind, "hitbox") == 0)
-          slice->setKind(SliceKind::Hitbox);
-        else if (std::strcmp(kind, "hurtbox") == 0)
-          slice->setKind(SliceKind::Hurtbox);
-      }
+      if (const char* kind = xmlSlice->Attribute("kind"))
+        slice->setKind(slice_kind_from_id(kind));
 
       // Slice text
       if (xmlSlice->Attribute("text"))

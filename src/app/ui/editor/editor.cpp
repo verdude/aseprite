@@ -55,6 +55,7 @@
 #include "app/ui/toolbar.h"
 #include "app/ui_context.h"
 #include "app/util/layer_utils.h"
+#include "app/util/slice_utils.h"
 #include "app/util/tile_flags_utils.h"
 #include "base/chrono.h"
 #include "base/convert_to.h"
@@ -1260,11 +1261,8 @@ void Editor::drawSlices(ui::Graphics* g)
                                  doc::rgba_getg(docColor),
                                  doc::rgba_getb(docColor),
                                  doc::rgba_geta(docColor));
-    if (slice->isCollisionBox()) {
-      auto& pref = Preferences::instance().collision;
-      color = color_utils::color_for_ui(slice->kind() == SliceKind::Hitbox ? pref.hitboxColor() :
-                                                                             pref.hurtboxColor());
-    }
+    if (slice->isCollisionBox())
+      color = color_utils::color_for_ui(get_collision_box_color(slice->kind()));
     gfx::Rect out = key->bounds();
     out.offset(mainOffset);
     out = editorToScreen(out);
@@ -2025,11 +2023,8 @@ bool Editor::isSliceVisible(const doc::Slice* slice) const
 {
   if (!slice || !slice->getByFrame(m_frame))
     return false;
-  switch (slice->kind()) {
-    case SliceKind::Hitbox:  return m_docPref.show.hitboxes();
-    case SliceKind::Hurtbox: return m_docPref.show.hurtboxes();
-    default:                 return m_docPref.show.slices();
-  }
+  return slice->isCollisionBox() ? get_collision_box_visibility(m_document, slice->kind())() :
+                                   m_docPref.show.slices();
 }
 
 bool Editor::canSelectSlice(const doc::Slice* slice) const

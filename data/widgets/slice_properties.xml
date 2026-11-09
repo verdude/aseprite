@@ -15,6 +15,7 @@
       <combobox id="box_kind">
         <listitem text="@collision.hitbox" />
         <listitem text="@collision.hurtbox" />
+        <listitem text="@collision.pushbox" />
       </combobox>
     </hbox>
     <grid columns="3" expansive="true">

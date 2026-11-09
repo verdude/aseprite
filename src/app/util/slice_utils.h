@@ -14,11 +14,20 @@
 namespace doc {
 class Slice;
 class Sprite;
+enum class SliceKind;
 } // namespace doc
 
 namespace app {
 
 class Site;
+class Color;
+class Doc;
+template<typename T>
+class Option;
+
+std::string get_collision_box_type_name(doc::SliceKind kind);
+Color get_collision_box_color(doc::SliceKind kind);
+Option<bool>& get_collision_box_visibility(const Doc* doc, doc::SliceKind kind);
 
 std::string get_unique_slice_name(const doc::Sprite* sprite,
                                   const std::string& namePrefix = std::string());

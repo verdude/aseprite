@@ -52,6 +52,7 @@
 #include "app/ui/selection_mode_field.h"
 #include "app/ui/skin/skin_theme.h"
 #include "app/ui_context.h"
+#include "app/util/slice_utils.h"
 #include "base/pi.h"
 #include "base/scoped_value.h"
 #include "doc/brush.h"
@@ -1744,13 +1745,9 @@ class ContextBar::SliceFields : public HBox {
   class Item : public ListItem {
   public:
     Item(const doc::Slice* slice)
-      : ListItem(slice->name() +
-                 (slice->isCollisionBox() ?
-                    " [" +
-                      (slice->kind() == doc::SliceKind::Hitbox ? Strings::collision_hitbox() :
-                                                                 Strings::collision_hurtbox()) +
-                      "]" :
-                    ""))
+      : ListItem(slice->name() + (slice->isCollisionBox() ?
+                                    " [" + get_collision_box_type_name(slice->kind()) + "]" :
+                                    ""))
       , m_sliceId(slice->id())
     {
     }
@@ -1823,11 +1820,12 @@ public:
   {
     auto* theme = SkinTheme::get(this);
 
-    m_kind.addItem(Strings::collision_hitbox());
-    m_kind.addItem(Strings::collision_hurtbox());
-    m_kind.setSelectedItemIndex(Preferences::instance().collision.createHurtbox() ? 1 : 0);
+    for (const auto kind : doc::CollisionBoxKinds)
+      m_kind.addItem(get_collision_box_type_name(kind));
+    m_kind.setSelectedItemIndex(int(Preferences::instance().collision.createKind()) - 1);
     m_kind.Change.connect([this] {
-      Preferences::instance().collision.createHurtbox(m_kind.getSelectedItemIndex() == 1);
+      Preferences::instance().collision.createKind(
+        doc::CollisionBoxKinds[m_kind.getSelectedItemIndex()]);
     });
     addChild(&m_kind);
     m_kind.setVisible(false);

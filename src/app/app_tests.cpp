@@ -28,6 +28,7 @@
 #include "app/tx.h"
 #include "app/ui/editor/editor.h"
 #include "app/ui/editor/editor_hit.h"
+#include "app/ui/editor/moving_slice_state.h"
 #include "app/ui/editor/tool_loop_impl.h"
 #include "app/ui/main_window.h"
 #include "app/ui/slice_window.h"
@@ -39,6 +40,7 @@
 #include "os/window.h"
 #include "ui/display.h"
 #include "ui/manager.h"
+#include "ui/message.h"
 #include "ui/system.h"
 #include "ui/window.h"
 
@@ -110,7 +112,7 @@ TEST(App, CollisionToolWorkflow)
   ASSERT_NE(nullptr, collision);
   ASSERT_TRUE(collision->getInk(0)->isCollisionBox());
   app.activeToolManager()->setSelectedTool(collision);
-  Preferences::instance().collision.createHurtbox(false);
+  Preferences::instance().collision.createKind(doc::SliceKind::Hitbox);
   Preferences::instance().slices.useKeys(false);
   editor->docPref().show.hitboxes(true);
   editor->docPref().show.hurtboxes(true);
@@ -152,7 +154,7 @@ TEST(App, CollisionToolWorkflow)
   editor->setFrame(1);
   EXPECT_TRUE(editor->getSite().selectedSlices().empty());
   EXPECT_FALSE(editor->isSliceVisible(hit));
-  Preferences::instance().collision.createHurtbox(true);
+  Preferences::instance().collision.createKind(doc::SliceKind::Hurtbox);
   drawBox(gfx::Point(3, 4), gfx::Point(10, 13));
   ASSERT_EQ(2, sprite->slices().size());
   auto* hurt = *sprite->slices().begin();
@@ -205,6 +207,100 @@ TEST(App, CollisionToolWorkflow)
   EXPECT_TRUE(editor->isSliceVisible(pasted));
   EXPECT_EQ(0, doc::count_diff_between_images(image.get(), editor->layer()->cel(0)->image()));
 
+  // Multiple pushboxes use the same overlap order, visibility and clipboard behavior.
+  Preferences::instance().collision.createKind(doc::SliceKind::Pushbox);
+  editor->docPref().show.pushboxes(false);
+  drawBox(gfx::Point(20, 3), gfx::Point(27, 12));
+  ASSERT_EQ(5, sprite->slices().size());
+  auto* push = *sprite->slices().begin();
+  EXPECT_EQ(doc::SliceKind::Pushbox, push->kind());
+  EXPECT_EQ(gfx::Rect(20, 3, 8, 10), push->getByFrame(0)->bounds());
+  EXPECT_TRUE(editor->isSliceVisible(push));
+  command(CommandId::DuplicateSlice());
+  ASSERT_EQ(6, sprite->slices().size());
+  auto* pushDuplicate = *sprite->slices().begin();
+  EXPECT_EQ(pushDuplicate, editor->calcHit(editor->editorToScreen(gfx::Point(24, 8))).slice());
+  editor->clearSlicesSelection();
+  editor->selectSlice(push);
+  command(CommandId::ShowPushboxes());
+  EXPECT_FALSE(editor->isSliceVisible(push));
+  EXPECT_FALSE(editor->isSliceVisible(pushDuplicate));
+  EXPECT_TRUE(editor->getSite().selectedSlices().empty());
+  EXPECT_TRUE(editor->isSliceVisible(hit));
+  EXPECT_TRUE(editor->isSliceVisible(pasted));
+  command(CommandId::ShowPushboxes());
+  {
+    doc::SelectedObjects selected;
+    selected.insert(push->id());
+    class InspectableBoxWindow : public SliceWindow {
+    public:
+      using SliceWindow::boxKind;
+      using SliceWindow::SliceWindow;
+    };
+    InspectableBoxWindow window(sprite, selected, 0);
+    EXPECT_EQ(doc::SliceKind::Pushbox, window.boxKindValue());
+    EXPECT_EQ(3, window.boxKind()->getItemCount());
+    for (int index = 0; index < 3; ++index) {
+      window.boxKind()->setSelectedItemIndex(index);
+      {
+        Tx tx(doc);
+        tx(new cmd::SetBoxKind(push, window.boxKindValue()));
+        tx.commit();
+      }
+      EXPECT_EQ(doc::CollisionBoxKinds[index], push->kind());
+      EXPECT_EQ(0, push->boxFrame());
+      EXPECT_EQ(gfx::Rect(20, 3, 8, 10), push->getByFrame(0)->bounds());
+      command(CommandId::Undo());
+      EXPECT_EQ(doc::SliceKind::Pushbox, push->kind());
+    }
+  }
+  // Moving/resizing one overlapping box leaves the other and pixels untouched.
+  auto transformPush = [&](int border, const gfx::Point& delta) {
+    doc::SelectedObjects selected;
+    selected.insert(push->id());
+    EditorHit hit(EditorHit::SliceBounds);
+    hit.setSlice(push);
+    hit.setBorder(border);
+    const gfx::Point start(24, 8);
+    ui::MouseMessage down(ui::kMouseDownMessage,
+                          ui::PointerType::Mouse,
+                          ui::kButtonLeft,
+                          ui::kKeyNoneModifier,
+                          editor->editorToScreen(start));
+    ui::MouseMessage move(ui::kMouseMoveMessage, down, editor->editorToScreen(start + delta));
+    down.setDisplay(editor->display());
+    move.setDisplay(editor->display());
+    auto state = std::make_shared<MovingSliceState>(editor, &down, hit, selected);
+    editor->setState(state);
+    state->onMouseMove(editor, &move);
+    state->onMouseUp(editor, &move);
+    state.reset();
+    // Normal event dispatch releases the completed state's transaction.
+    ui::MouseMessage cursor(ui::kSetCursorMessage, move, move.position());
+    cursor.setDisplay(editor->display());
+    editor->sendMessage(&cursor);
+  };
+  transformPush(ui::CENTER | ui::MIDDLE, gfx::Point(2, 1));
+  EXPECT_EQ(gfx::Rect(22, 4, 8, 10), push->getByFrame(0)->bounds());
+  EXPECT_EQ(gfx::Rect(22, 5, 8, 10), pushDuplicate->getByFrame(0)->bounds());
+  command(CommandId::Undo());
+  EXPECT_EQ(gfx::Rect(20, 3, 8, 10), push->getByFrame(0)->bounds());
+  transformPush(ui::RIGHT | ui::BOTTOM, gfx::Point(2, 1));
+  EXPECT_EQ(gfx::Rect(20, 3, 10, 11), push->getByFrame(0)->bounds());
+  command(CommandId::Undo());
+  EXPECT_EQ(gfx::Rect(20, 3, 8, 10), push->getByFrame(0)->bounds());
+  ctx->clipboard()->copySlices({ push });
+  editor->setFrame(1);
+  EXPECT_FALSE(editor->isSliceVisible(push));
+  ctx->clipboard()->paste(ctx, true, nullptr);
+  auto* pastedPush = *sprite->slices().begin();
+  ASSERT_EQ(7, sprite->slices().size());
+  EXPECT_EQ(doc::SliceKind::Pushbox, pastedPush->kind());
+  EXPECT_EQ(1, pastedPush->boxFrame());
+  EXPECT_TRUE(editor->isSliceVisible(pastedPush));
+  EXPECT_EQ(0, doc::count_diff_between_images(image.get(), editor->layer()->cel(0)->image()));
+  editor->setFrame(0);
+
   // Regular slice selection still spans frames and excludes collision boxes.
   app.activeToolManager()->setSelectedTool(app.toolBox()->getToolById("slice"));
   editor->docPref().show.slices(true);
@@ -232,7 +328,7 @@ TEST(App, CollisionToolWorkflow)
   auto* destination = ctx->activeDocument()->sprite();
   ctx->clipboard()->paste(ctx, true, nullptr);
   EXPECT_EQ(2, destination->totalFrames());
-  EXPECT_EQ(2, destination->slices().size());
+  EXPECT_EQ(3, destination->slices().size());
   for (auto* box : destination->slices()) {
     EXPECT_TRUE(box->isCollisionBox());
     EXPECT_EQ(0, box->boxFrame());

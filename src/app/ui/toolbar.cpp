@@ -377,10 +377,13 @@ void ToolBar::onPaint(ui::PaintEvent& ev)
       rc.offset(-this->bounds().origin());
       g->drawRect(
         color_utils::color_for_ui(colors.hitboxColor()),
-        Rect(rc.x + 3 * guiscale(), rc.y2() - 5 * guiscale(), 4 * guiscale(), 3 * guiscale()));
+        Rect(rc.x + 2 * guiscale(), rc.y2() - 5 * guiscale(), 3 * guiscale(), 3 * guiscale()));
       g->drawRect(
         color_utils::color_for_ui(colors.hurtboxColor()),
-        Rect(rc.x + 8 * guiscale(), rc.y2() - 5 * guiscale(), 4 * guiscale(), 3 * guiscale()));
+        Rect(rc.x + 6 * guiscale(), rc.y2() - 5 * guiscale(), 3 * guiscale(), 3 * guiscale()));
+      g->drawRect(
+        color_utils::color_for_ui(colors.pushboxColor()),
+        Rect(rc.x + 10 * guiscale(), rc.y2() - 5 * guiscale(), 3 * guiscale(), 3 * guiscale()));
     }
   }
 

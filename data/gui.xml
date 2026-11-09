@@ -1026,6 +1026,7 @@
           <item command="ShowSlices" text="@.view_show_slices" />
           <item command="ShowHitboxes" text="@collision.show_hitboxes" />
           <item command="ShowHurtboxes" text="@collision.show_hurtboxes" />
+          <item command="ShowPushboxes" text="@collision.show_pushboxes" />
           <item command="ShowPixelGrid" text="@.view_show_pixel_grid" />
           <item command="ShowTileNumbers" text="@.view_show_tile_numbers" />
           <separator />
